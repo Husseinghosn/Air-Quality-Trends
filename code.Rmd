@@ -22,3 +22,21 @@ Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by press
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+## Variables
+```{r}
+names(data)
+```
+# Part 1: Exploratory Data Analysis
+
+## Q1. Summary Statistics
+```{r}
+# Replace commas with dots and convert
+data$`CO(GT)` <- as.numeric(gsub(",", ".", data$`CO(GT)`))
+data$`C6H6(GT)` <- as.numeric(gsub(",", ".", data$`C6H6(GT)`))
+data$T <- as.numeric(gsub(",", ".", data$T))
+data$RH <- as.numeric(gsub(",", ".", data$RH))
+data$AH <- as.numeric(gsub(",", ".", data$AH))
+
+summary(data)
+```
