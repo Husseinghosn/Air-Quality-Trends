@@ -160,23 +160,85 @@ for (col in numerical_variables){
 
 
 ```{r}
+pollutant_variables = c("co_mg_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
+independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
 
+fill_missing_values = function(df, method = FALSE){
+  if (method == FALSE) return(df)
+  
+  set.seed(123)
+  
+  for (col in names(df)){
+    x = df[[col]]
+    if (is.numeric(x)){
+      missing = which(x == -200)
+      
+      if (length(missing) > 0) {
+        # For the method value we can add the imputation method we are looking for
+        if (method == "Mean") { df[[col]][missing] = mean(x[x != -200], na.rm = TRUE)}
+        if (method == "Median") { df[[col]][missing] = median(x[x != -200], na.rm = TRUE)}
+        if (method == "Mode") { 
+          mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
+          df[[col]][missing] = as.numeric(mode_values)}
+        if (method == "Random") {
+          set.seed(123)
+          df[[col]][missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+      }
+    }
+  }
+return(df)
+}
+  
+  
+
+model_trends_function = function(df, pollutant, variables, clean = FALSE) {
+  df = fill_missing_values(df, method = clean)
+  if (any(df == -200, na.rm = TRUE) == TRUE & clean != FALSE) return(print("there are still missing values"))
+  model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
+  print(pollutant)
+  print(clean)
+  model_trend = lm(model_formula,
+                   data = df)
+  summary(model_trend)}
+
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables))
+}
 
 ```
 
 
 ```{r}
 
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mean"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mode"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Median"))
+}
 
 ```
 
 
 ```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Random"))
+}
 
-```
 
-
-```{r}
 ```
 
 
