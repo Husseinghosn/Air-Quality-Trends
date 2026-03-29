@@ -6,6 +6,7 @@ output: html_notebook
 
 ```{r}
 library(readr)
+library(ggplot2)
 
 data_url = "https://archive.ics.uci.edu/static/public/360/air+quality.zip"
 
@@ -25,6 +26,11 @@ The preview shows you a rendered HTML copy of the contents of the editor. Conseq
 
 ## Variables
 ```{r}
+str(data)
+```
+
+
+```{r}
 names(data)
 ```
 # Part 1: Exploratory Data Analysis
@@ -38,5 +44,221 @@ data$T <- as.numeric(gsub(",", ".", data$T))
 data$RH <- as.numeric(gsub(",", ".", data$RH))
 data$AH <- as.numeric(gsub(",", ".", data$AH))
 
+# Rename columns to make them understandable
+names(data) = c("date",
+                "time",
+                "co_mg_m3",
+                "sensor_co",
+                "nmhc_ug_m3",
+                "benzene_ug_m3",
+                "sensor_nmhc",
+                "nox_ppb",
+                "sensor_nox",
+                "no2_ug_m3",
+                "sensor_no2",
+                "sensor_o3",
+                "temperature_c",
+                "relative_humidty",
+                "absolute_humidity")
+
 summary(data)
 ```
+```{r}
+str(data)
+```
+
+
+
+```{r}
+# percentage of null values per column
+sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
+```
+
+
+```{r}
+# Get the numerical columns from the data
+numerical_variables = names(data)[sapply(data, is.numeric)]
+numeric_data = data[, numerical_variables]
+
+numerical_variables
+numeric_data
+```
+
+
+```{r}
+# Function to plot the distribution of numerical columns, 
+# this column accepts a dataframe, the column name (name) and 
+# a clean parameter to plot the distribution while replacing -200 based on the method that is chosen (True, False, Mean, Median, Mode, Random sample from sample space)
+
+plot_numerical_distrbuition = function(df, name, clean = FALSE) {
+  x = df[[name]]
+  missing = which(x == -200)
+  # For the clean value we can add the imputation method we are looking for
+  if (clean == TRUE){ x = x[x != -200] }
+  if (clean == "Mean") { x[missing] = mean(x[x != -200], na.rm = TRUE)}
+  if (clean == "Median") { x[missing] = median(x[x != -200], na.rm = TRUE)}
+  if (clean == "Mode") { 
+    mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
+    x[missing] = as.numeric(mode_values)}
+  if (clean == "Random") {
+    set.seed(123)
+    x[missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+  tmp = data.frame(value = x)
+  
+  ggplot(tmp, aes(x = value)) +
+    geom_histogram(aes(y = ..density..),
+                   bins = 30,
+                   fill = "steelblue",
+                   alpha = 0.7) +
+    labs(title = paste("Distribution of", name),
+         x = name,
+         y = "Density") + 
+    theme_minimal()
+}
+```
+
+
+```{r}
+# Plotting distribution of raw data
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing disregarding -200 values
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = TRUE))
+}
+```
+```{r}
+# Plotting distribution replacing -200 values with mean
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mean"))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing -200 values with median
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Median"))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing -200 values with mode
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mode"))
+}
+```
+```{r}
+# Plotting distribution replacing -200 values with random sample
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Random"))
+}
+```
+```{r}
+library(corrplot)
+numeric_data = data[, sapply(data, is.numeric)]
+numeric_data[numeric_data == -200] = NA
+numeric_data = numeric_data[complete.cases(numeric_data),]
+
+corr_matrix = cor(numeric_data)
+corrplot(corr_matrix, method = "color", tl.cex = 0.8)
+
+```
+
+
+```{r}
+pollutant_variables = c("co_mg_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
+independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
+
+fill_missing_values = function(df, method = FALSE){
+  if (method == FALSE) return(df)
+  
+  set.seed(123)
+  
+  for (col in names(df)){
+    x = df[[col]]
+    if (is.numeric(x)){
+      missing = which(x == -200)
+      
+      if (length(missing) > 0) {
+        # For the method value we can add the imputation method we are looking for
+        if (method == "Mean") { df[[col]][missing] = mean(x[x != -200], na.rm = TRUE)}
+        if (method == "Median") { df[[col]][missing] = median(x[x != -200], na.rm = TRUE)}
+        if (method == "Mode") { 
+          mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
+          df[[col]][missing] = as.numeric(mode_values)}
+        if (method == "Random") {
+          set.seed(123)
+          df[[col]][missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+      }
+    }
+  }
+return(df)
+}
+  
+  
+
+model_trends_function = function(df, pollutant, variables, clean = FALSE) {
+  df = fill_missing_values(df, method = clean)
+  if (any(df == -200, na.rm = TRUE) == TRUE & clean != FALSE) return(print("there are still missing values"))
+  model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
+  print(pollutant)
+  print(clean)
+  model_trend = lm(model_formula,
+                   data = df)
+  summary(model_trend)}
+
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables))
+}
+
+```
+
+
+```{r}
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mean"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mode"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Median"))
+}
+
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Random"))
+}
+
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
