@@ -78,7 +78,10 @@ sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
 ```{r}
 # Get the numerical columns from the data
 numerical_variables = names(data)[sapply(data, is.numeric)]
+numeric_data = data[, numerical_variables]
+
 numerical_variables
+numeric_data
 ```
 
 
@@ -156,6 +159,16 @@ for (col in numerical_variables){
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Random"))
 }
+```
+```{r}
+library(corrplot)
+numeric_data = data[, sapply(data, is.numeric)]
+numeric_data[numeric_data == -200] = NA
+numeric_data = numeric_data[complete.cases(numeric_data),]
+
+corr_matrix = cor(numeric_data)
+corrplot(corr_matrix, method = "color", tl.cex = 0.8)
+
 ```
 
 
