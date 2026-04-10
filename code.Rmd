@@ -32,6 +32,22 @@ str(data)
 
 ```{r}
 names(data)
+numeric_data <- data[, sapply(data, is.numeric)]
+
+
+table <- data.frame(
+  Variable = names(numeric_data),
+  Min = sapply(numeric_data, function(x) min(x, na.rm = TRUE)),
+  Q1 = sapply(numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
+  Mean = sapply(numeric_data, function(x) mean(x, na.rm = TRUE)),
+  Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
+)
+
+rownames(table) <- NULL
+
+table
 ```
 # Part 1: Exploratory Data Analysis
 
@@ -62,8 +78,23 @@ names(data) = c("date",
                 "relative_humidty",
                 "absolute_humidity")
 
-summary(data)
+numeric_data <- data[, sapply(data, is.numeric)]
+
+table <- data.frame(
+  Variable = names(numeric_data),
+  Min = sapply(numeric_data, function(x) min(x, na.rm = TRUE)),
+  Q1 = sapply(numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
+  Mean = sapply(numeric_data, function(x) mean(x, na.rm = TRUE)),
+  Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
+)
+
+rownames(table) <- NULL
+
+table
 ```
+
 ```{r}
 str(data)
 ```
@@ -178,141 +209,180 @@ pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "n
 data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
 independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
 
-fill_missing_values = function(df, method = FALSE){
-  if (method == FALSE) return(df)
-  
-  set.seed(123)
-  
-  for (col in names(df)){
-    x = df[[col]]
-    if (is.numeric(x)){
-      missing = which(x == -200)
-      
+## Median is defaulted as impute_data function
+impute_data = function(df, method = "median") {
+  df_copy <- df
+  for (col in names(df_copy)) {
+    if (is.numeric(df_copy[[col]])) {
+      x <- df_copy[[col]]
+      missing <- which(is.na(x))
       if (length(missing) > 0) {
-        # For the method value we can add the imputation method we are looking for
-        if (method == "Mean") { df[[col]][missing] = mean(x[x != -200], na.rm = TRUE)}
-        if (method == "Median") { df[[col]][missing] = median(x[x != -200], na.rm = TRUE)}
-        if (method == "Mode") { 
-          mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
-          df[[col]][missing] = as.numeric(mode_values)}
-        if (method == "Random") {
+        
+        if (method == "mean") {
+          x[missing] <- mean(x, na.rm = TRUE)
+        }
+        
+        if (method == "median") {
+          x[missing] <- median(x, na.rm = TRUE)
+        }
+        
+        if (method == "mode") {
+          mode_val <- as.numeric(names(sort(table(x), decreasing = TRUE)[1]))
+          x[missing] <- mode_val
+        }
+        
+        if (method == "random") {
           set.seed(123)
-          df[[col]][missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+          x[missing] <- sample(x[!is.na(x)], length(missing), replace = TRUE)
+        }
+        
+        df_copy[[col]] <- x
       }
     }
   }
-return(df)
-}
-
-
-# New impute method
-
-library(Hmisc)
-
-impute_data = function(df) {
-  df_copy <- df
-  df_copy[] <- lapply(df_copy, function(col) {
-    if (is.numeric(col)) {
-      col[col == -200] <- NA
-      return(as.numeric(impute(col, fun = median)))
-    } else {
-      return(col)
-    }
-  })
+  
   return(df_copy)
 }
   
 
-model_trends_function = function(df, pollutant, variables, clean = FALSE) {
-  df = fill_missing_values(df, method = clean)
-  if (any(df == -200, na.rm = TRUE) == TRUE & clean != FALSE) return(print("there are still missing values"))
+model_trends_function_impute = function(df, pollutant, variables, method = "median") {
+  df <- impute_data(df, method = method)
   model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
-  print(pollutant)
-  print(clean)
-  model_trend = lm(model_formula,
-                   data = df)
-  summary(model_trend)}
-
-
-# Utilizes new impute method
-model_trends_function_impute = function(df, pollutant, variables, clean = FALSE) {
-  
-  if (clean == TRUE) {
-    df = impute_data(df)
-  }
-  model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
-  print(paste(pollutant))
-  print("Method: Hmisc impute (median)")
+  cat("\nPollutant:", pollutant, "\n")
+  cat("Impute Method:", method, "\n")
   model_trend = lm(model_formula, data = df)
   summary(model_trend)
 }
-
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables))
-}
-
-```
-
-
-```{r}
-
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, clean = "Mean"))
-}
-```
-
-
-```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, clean = "Mode"))
-}
-```
-
-
-```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, clean = "Median"))
-}
-
 ```
 
 ```{r}
-for (col in pollutant_variables){
-  
-  cat("ORIGINAL (Mean):", col, "\n")
-  print(model_trends_function(data, col, independent_variables, clean = "Median"))
-  
-  cat("\nIMPUTE() METHOD:", col, "\n")
-  print(model_trends_function_impute(data, col, independent_variables, clean = TRUE))
+methods <- c("mean", "median", "mode", "random")
+
+for (m in methods){
+  for (col in pollutant_variables){
+    cat("METHOD:", toupper(m), "\n")
+    print(model_trends_function_impute(data, col, independent_variables, method = m))
+  }
 }
 ```
 
 
 
 ```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, clean = "Random"))
-}
+data_impute_median <- impute_data(data, "median")
+data_impute_mean <- impute_data(data, "mean")
+data_impute_mode <- impute_data(data, "mode")
+data_impute_random <- impute_data(data, "random")
 
 
-```
-
-
-```{r}
-data <- na.omit(data)
-data_median <- fill_missing_values(data, method = "Median")
-ggplot(data_median, aes(x = datetime, y = co_ug_m3)) +
+ggplot(na.omit(data_impute_median), aes(x = datetime, y = co_ug_m3)) +
   geom_line() +
   theme_minimal() +
-  labs(title = "CO Over Time")
+  labs(title = "CO Over Time (Impute median)")
+
+ggplot(na.omit(data_impute_mean), aes(x = datetime, y = co_ug_m3)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "CO Over Time (Impute mean)")
+
+ggplot(na.omit(data_impute_mode), aes(x = datetime, y = co_ug_m3)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "CO Over Time (Impute mode)")
+
+ggplot(na.omit(data_impute_random), aes(x = datetime, y = co_ug_m3)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "CO Over Time (Impute random)")
+```
+
+
+
+```{r}
+library(dplyr)
+data_zoom <- data_impute_median %>%
+  filter(datetime >= as.POSIXct("2004-03-01"),
+         datetime <= as.POSIXct("2004-03-31"))
+
+ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
+  geom_line() +
+  theme_minimal()
+
+data_zoom <- data_impute_median %>%
+  filter(datetime >= as.POSIXct("2004-04-01"),
+         datetime <= as.POSIXct("2004-04-30"))
+
+ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
+  geom_line() +
+  theme_minimal()
+
+data_zoom <- data_impute_median %>%
+  filter(datetime >= as.POSIXct("2004-05-01"),
+         datetime <= as.POSIXct("2004-05-30"))
+
+ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
+  geom_line() +
+  theme_minimal()
+
+data_zoom <- data_impute_median %>%
+  filter(datetime >= as.POSIXct("2004-06-01"),
+         datetime <= as.POSIXct("2004-06-30"))
+
+ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
+  geom_line() +
+  theme_minimal()
+```
+
+
+```{r}
+library(dplyr)
+data_impute <- data_impute %>%
+  mutate(
+    airstandard_co = 10,
+    airstandard_nmhc = 300,
+    airstandard_c6h6 = 5,
+    airstandard_nox = 100,
+    airstandard_no2 = 40
+  )
+
+data_impute <- data_impute %>%
+  mutate(
+    co_bad   = co_ug_m3 > airstandard_co,
+    nmhc_bad = nmhc_ug_m3 > airstandard_nmhc,
+    c6h6_bad = benzene_ug_m3 > airstandard_c6h6,
+    nox_bad  = nox_ppb > airstandard_nox,
+    no2_bad  = no2_ug_m3 > airstandard_no2
+  )
+
+data_impute <- data_impute %>%
+  mutate(
+    pollution_count = co_bad + nmhc_bad + c6h6_bad + nox_bad + no2_bad
+  )
+
+data_impute <- data_impute %>%
+  mutate(
+    air_quality = case_when(
+      pollution_count == 0 ~ "Healthy",
+      pollution_count == 1 ~ "Minor Pollution",
+      pollution_count <= 3 ~ "Polluted",
+      TRUE ~ "Major Pollution"
+    )
+  )
+
 ```
 
 ```{r}
-data_impute <- impute_data(data)
-
-ggplot(data_impute, aes(x = datetime, y = co_ug_m3)) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = "CO Over Time (Impute Mean)")
+ggplot(data_impute, aes(x = air_quality)) +
+  geom_bar(fill = "steelblue") +
+  theme_minimal()
+```
+```{r}
+ggplot(data_impute, aes(datetime, fill = air_quality)) +
+  geom_histogram(binwidth = 86400) +  # daily bins
+  theme_minimal()
 ```
 
+
+```{r}
+sum(data_impute$exceed_8hr, na.rm = TRUE)
+```
