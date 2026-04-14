@@ -170,12 +170,15 @@ corr_matrix = cor(numeric_data)
 corrplot(corr_matrix, method = "color", tl.cex = 0.8)
 
 ```
-
-
 ```{r}
 pollutant_variables = c("co_mg_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
 data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
 independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
+```
+
+
+```{r}
+
 
 fill_missing_values = function(df, method = FALSE){
   if (method == FALSE) return(df)
@@ -270,11 +273,11 @@ data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
 
 
 ```{r}
-breakpoints = data.frame(pollutant = c("co", "co", "no2", "no2", "benzene", "benzene", "nhmc", "nhmc", "nox", "nox"),
-                         bp_low = c(0.0, 4.5, 0, 54, 0, 1, 0, 200, 0, 54),
-                         bp_high = c(4.4, 9.4, 53, 100, 1, 3, 200, 400, 53, 100),
-                         i_low = c(0, 51, 0, 51, 0, 51, 0, 51, 0, 51),
-                         i_high = c(50, 100, 50, 100, 50, 100, 50, 100, 50, 100))
+breakpoints = data.frame(pollutant = c("co", "co", "no2", "no2", "benzene", "benzene", "nox", "nox"),
+                         bp_low = c(0.0, 4.5, 0, 54, 0, 1, 0, 54),
+                         bp_high = c(4.4, 9.4, 53, 100, 1, 3,  53, 100),
+                         i_low = c(0, 51, 0, 51, 0, 51, 0, 51),
+                         i_high = c(50, 100, 50, 100, 50, 100, 50, 100))
 breakpoints
 ```
 
@@ -290,60 +293,6 @@ aqi_index = function(Cp, pollutant, breakpoints) {
   I = (((bp$i_high - bp$i_low) / (bp$bp_high - bp$bp_low)) * (Cp - bp$bp_low)) + bp$i_low
   return(I)
 }
-```
-
-```{r}
-
-```
-
-```{r}
-data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
-data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
-data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
-data$i_nmhc = sapply(data$nmhc_ug_m3, aqi_index, pollutant = "nmhc", breakpoints = breakpoints)
-data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
-```
-
-
-```{r}
-data
-```
-```{r}
-str(data[, c("i_co","i_no2", "i_benzene", "i_nmhc", "i_nox")])
-```
-
-
-```{r}
-data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nmhc, data$i_nox, na.rm = TRUE)
-data$aqi_health = ifelse(data$aqi <= 80, "healthy", "not_healthy")
-data
-```
-
-```{r}
-table(data$aqi_health)
-```
-```{r}
-data$healthy_co = ifelse(data$co_mg_m3 < 10, 1, 0)
-data$healthy_nmhc = ifelse(data$nmhc_ug_m3 < 500, 1, 0)
-data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
-data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
-data$healthy_no2 = ifelse(data$no2_ug_m3 < 53, 1, 0)
-```
-
-
-```{r}
-data$health_score = data$healthy_benzene + data$healthy_co + data$healthy_nmhc + data$healthy_no2 + data$healthy_nox
-data$threshold_health = ifelse(data$health_score >= 3, "healthy", "not_healthy")
-```
-
-
-```{r}
-table(data$threshold_health)
-```
-
-
-```{r}
-names(data)
 ```
 
 
@@ -400,24 +349,69 @@ plot_health_over_time <- function(df, health_col = "aqi_health",
 
 
 ```{r}
-plot_health_over_time(data)
-
-```
-
-
-```{r}
-plot_health_over_time(data, health_col = "threshold_health", time_unit = "month")
-
-```
-
-
-```{r}
-plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
-```
-
-
-```{r}
 unique(data$aqi_health)
 unique(data$threshold_health)
+```
+```{r}
+plot_pollutants_by_health <- function(df, pollutants, health_col) {
+  library(ggplot2)
+  library(tidyr)
+  
+  long_df <- df %>%
+    select(all_of(pollutants), all_of(health_col)) %>%
+    pivot_longer(cols = all_of(pollutants),
+                 names_to = "pollutant",
+                 values_to = "value")
+  
+  ggplot(long_df, aes(x = value, fill = .data[[health_col]])) +
+    geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
+    facet_wrap(~ pollutant, scales = "free") +
+    scale_fill_manual(values = c("healthy" = "forestgreen",
+                                 "not_healthy" = "firebrick")) +
+    labs(
+      title = paste("Pollutant Distributions by", health_col),
+      x = "Concentration",
+      y = "Count",
+      fill = "Health Status"
+    ) +
+    theme_minimal()
+}
+
+```
+
+
+
+```{r}
+data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
+data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
+data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
+data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
+
+data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nox, na.rm = TRUE)
+data$aqi_health = ifelse(data$aqi <= 70, "healthy", "not_healthy")
+
+table(data$aqi_health)
+
+plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
+
+pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
+plot_pollutants_by_health(data, pollutants, "aqi_health")
+```
+
+
+```{r}
+data$healthy_co = ifelse(data$co_mg_m3 < 10, 1, 0)
+data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
+data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
+data$healthy_no2 = ifelse(data$no2_ug_m3 < 53, 1, 0)
+
+data$health_score = data$healthy_benzene + data$healthy_co + data$healthy_no2 + data$healthy_nox
+data$threshold_health = ifelse(data$health_score >= 2, "healthy", "not_healthy")
+
+table(data$threshold_health)
+
+plot_health_over_time(data, health_col = "threshold_health", time_unit = "month")
+
+plot_pollutants_by_health(data, pollutants, "threshold_health")
 ```
 
