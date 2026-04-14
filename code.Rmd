@@ -1,6 +1,6 @@
 ---
 title: "Project"
-author: "Hussein Ghosin, Kazume Bowring, Derrick Li"
+author: "Hussein Ghosin, Kazuma Bowring, Derrick Li"
 date: "2026-04-14"
 output: ioslides_presentation
 ---
