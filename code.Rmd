@@ -1,10 +1,23 @@
 ---
+title: "Project"
+author: "Hussein Ghosin, Kazume Bowring, Derrick Li"
+date: "2026-04-14"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+---
 title: "Air-Quality-Trends"
 output: html_notebook
 ---
 
 
-```{r}
+```{r, echo = FALSE}
+
+#NOTE FOR KNITTING PRESENTATION WE NEED A ## HEADER before the code block so it includes the output of that block, otherwise it will ignore the entire block on knit
 library(readr)
 library(ggplot2)
 
@@ -15,7 +28,7 @@ unzip("~/air_quality.zip")
 
 data = read_delim("AirQualityUCI.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
 data = data[, colSums(!is.na(data)) > 0]
-head(data)
+#head(data)
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
@@ -25,16 +38,16 @@ When you save the notebook, an HTML file containing the code and output will be 
 The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
 
 ## Variables
-```{r}
+```{r, echo = FALSE}
 str(data)
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 names(data)
 ```
 
-```{r}
+```{r, echo = FALSE}
 names(data)
 numeric_data <- data[, sapply(data, is.numeric)]
 
@@ -58,7 +71,7 @@ table
 # Part 1: Exploratory Data Analysis
 
 ## Q1. Summary Statistics
-```{r}
+```{r, echo = FALSE}
 # Replace commas with dots and convert
 data$`CO(GT)` <- as.numeric(gsub(",", ".", data$`CO(GT)`))
 data$`C6H6(GT)` <- as.numeric(gsub(",", ".", data$`C6H6(GT)`))
@@ -100,17 +113,17 @@ rownames(table) <- NULL
 
 table
 ```
-```{r}
+```{r, echo = FALSE}
 str(data)
 ```
 
 
 
-```{r}
+```{r, echo = FALSE}
 # percentage of null values per column
 sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
 ```
-```{r}
+```{r, echo = FALSE}
 # Date and Time that are NA
 cols_to_check <- setdiff(names(data), c("date", "time"))
 
@@ -127,7 +140,7 @@ data <- data[!apply(is.na(data[sensor_cols]), 1, all), ]
 
 
 
-```{r}
+```{r, echo = FALSE}
 # Get the numerical columns from the data
 numerical_variables = names(data)[sapply(data, is.numeric)]
 numeric_data = data[, numerical_variables]
@@ -137,7 +150,7 @@ numeric_data
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Function to plot the distribution of numerical columns, 
 # this column accepts a dataframe, the column name (name) and 
 # a clean parameter to plot the distribution while replacing -200 based on the method that is chosen (True, False, Mean, Median, Mode, Random sample from sample space)
@@ -170,7 +183,7 @@ plot_numerical_distrbuition = function(df, name, clean = FALSE) {
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution of raw data
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col))
@@ -178,13 +191,13 @@ for (col in numerical_variables){
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution replacing disregarding -200 values
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = TRUE))
 }
 ```
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution replacing -200 values with mean
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Mean"))
@@ -192,7 +205,7 @@ for (col in numerical_variables){
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution replacing -200 values with median
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Median"))
@@ -200,19 +213,20 @@ for (col in numerical_variables){
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution replacing -200 values with mode
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Mode"))
 }
 ```
-```{r}
+```{r, echo = FALSE}
 # Plotting distribution replacing -200 values with random sample
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Random"))
 }
 ```
-```{r}
+## Correlation Plot
+```{r, echo = FALSE}
 library(corrplot)
 numeric_data = data[, sapply(data, is.numeric)]
 numeric_data[numeric_data == -200] = NA
@@ -223,7 +237,7 @@ corrplot(corr_matrix, method = "color", tl.cex = 0.8)
 
 ```
 
-```{r}
+```{r, echo = FALSE}
 pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
 data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
 independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
@@ -274,30 +288,30 @@ model_trends_function = function(df, pollutant, variables, method = "median") {
 }
 ```
 
-```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables))
-}
+```{r, echo = FALSE}
+#for (col in pollutant_variables){
+#  print(model_trends_function(data, col, independent_variables))
+#}
 
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, method = "Mean"))
-}
+#for (col in pollutant_variables){
+#  print(model_trends_function(data, col, independent_variables, method = "Mean"))
+#}
 ```
 
 
-```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, method = "Mode"))
-}
+```{r, echo = FALSE}
+#for (col in pollutant_variables){
+#  print(model_trends_function(data, col, independent_variables, method = "Mode"))
+#}
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 for (col in pollutant_variables){
   print(model_trends_function(data, col, independent_variables, method = "Median"))
 }
@@ -305,16 +319,17 @@ for (col in pollutant_variables){
 ```
 
 
-```{r}
-for (col in pollutant_variables){
-  print(model_trends_function(data, col, independent_variables, method = "Random"))
-}
+```{r, echo = FALSE}
+#for (col in pollutant_variables){
+#  print(model_trends_function(data, col, independent_variables, method = "Random"))
+#}
 
 
 ```
 
 
-```{r}
+```{r, echo = FALSE}
+#only necessary if we dont clean the data beforehand
 replace_missing_values = function(x) {
   valid_mean = mean(x[x != -200], na.rm = TRUE)
   x[is.na(x)] = valid_mean
@@ -327,8 +342,8 @@ data$co_ppm = data$co_ug_m3 * 24.45 / (28.01*1000)
 data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
 ```
 
-
-```{r}
+## Breakpoints
+```{r, echo = FALSE}
 breakpoints = data.frame(pollutant = c("co", "co", "co", "co","co", "co", "no2", "no2", "no2", "no2", "no2", "no2", "benzene", "benzene", "benzene", "benzene","benzene", "benzene", "nox", "nox","nox", "nox","nox", "nox"),
                          bp_low = c(0.0, 4.4, 9.4, 12.4, 15.4, 30.4, 0, 54, 101, 361, 650, 1250, 0, 5, 10, 20, 30, 50, 0, 53, 100, 360, 649, 1249),
                          bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 54, 101, 361, 650, 1250, 2049, 5, 10, 20, 30, 50, 80, 53, 100, 360, 649, 1249, 2049),
@@ -338,7 +353,7 @@ breakpoints
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 
 aqi_index = function(Cp, pollutant, breakpoints) {
   bp = breakpoints[breakpoints$pollutant == pollutant & Cp >= breakpoints$bp_low & Cp <= breakpoints$bp_high, ]
@@ -355,7 +370,7 @@ aqi_index = function(Cp, pollutant, breakpoints) {
 
 
 
-```{r}
+```{r, echo = FALSE}
 plot_health_over_time <- function(df, health_col = "aqi_health",
                                   time_unit = "day") {
   library(ggplot2)
@@ -405,7 +420,7 @@ plot_health_over_time <- function(df, health_col = "aqi_health",
 ```
 
 
-```{r}
+```{r, echo = FALSE}
 plot_pollutants_by_health <- function(df, pollutants, health_col) {
   library(ggplot2)
   library(tidyr)
@@ -434,8 +449,8 @@ plot_pollutants_by_health <- function(df, pollutants, health_col) {
 
 
 
-
-```{r}
+## Pollutant Distribution by AQI index
+```{r, echo = FALSE}
 data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
 data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
 data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
@@ -452,13 +467,13 @@ pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
 plot_pollutants_by_health(data, pollutants, "aqi_health")
 ```
 
-```{r}
+```{r, echo = FALSE}
 names(data)
 na_counts <- sapply(data, function(x) sum(is.na(x)))
 na_counts
 ```
-
-```{r}
+## Pollutant Distributions by healthy rating threshold
+```{r, echo = FALSE}
 data$healthy_co = ifelse(data$co_ug_m3 < 10, 1, 0)
 data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
 data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
