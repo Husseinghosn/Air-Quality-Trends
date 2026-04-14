@@ -274,8 +274,8 @@ data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
 
 ```{r}
 breakpoints = data.frame(pollutant = c("co", "co", "co", "co","co", "co", "no2", "no2", "no2", "no2", "no2", "no2", "benzene", "benzene", "benzene", "benzene","benzene", "benzene", "nox", "nox","nox", "nox","nox", "nox"),
-                         bp_low = c(0.0, 4.5, 9.5, 12.5, 15.5, 30.5, 0, 54, 101, 361, 650, 1250, 0, 1, 3, 6, 10, 20, 0, 54, 101, 361, 650, 1250),
-                         bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 53, 100, 360, 649, 1249, 2049, 1, 3, 6, 10, 20, 30, 53, 100, 360, 649, 1249, 2049),
+                         bp_low = c(0.0, 4.4, 9.4, 12.4, 15.4, 30.4, 0, 54, 101, 361, 650, 1250, 0, 5, 10, 20, 30, 50, 0, 53, 100, 360, 649, 1249),
+                         bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 54, 101, 361, 650, 1250, 2049, 5, 10, 20, 30, 50, 80, 53, 100, 360, 649, 1249, 2049),
                          i_low = c(0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301),
                          i_high = c(50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500))
 breakpoints
@@ -377,6 +377,8 @@ plot_pollutants_by_health <- function(df, pollutants, health_col) {
 ```
 
 
+
+
 ```{r}
 data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
 data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
@@ -384,7 +386,7 @@ data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", br
 data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
 
 data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nox, na.rm = TRUE)
-data$aqi_health = ifelse(data$aqi <= 130, "healthy", "not_healthy")
+data$aqi_health = ifelse(data$aqi <= 120, "healthy", "not_healthy")
 data
 table(data$aqi_health)
 
