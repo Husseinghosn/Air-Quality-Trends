@@ -6,6 +6,7 @@ output: html_notebook
 
 ```{r}
 library(readr)
+library(ggplot2)
 
 data_url = "https://archive.ics.uci.edu/static/public/360/air+quality.zip"
 
@@ -25,6 +26,11 @@ The preview shows you a rendered HTML copy of the contents of the editor. Conseq
 
 ## Variables
 ```{r}
+str(data)
+```
+
+
+```{r}
 names(data)
 ```
 # Part 1: Exploratory Data Analysis
@@ -38,5 +44,375 @@ data$T <- as.numeric(gsub(",", ".", data$T))
 data$RH <- as.numeric(gsub(",", ".", data$RH))
 data$AH <- as.numeric(gsub(",", ".", data$AH))
 
+# Rename columns to make them understandable
+names(data) = c("date",
+                "time",
+                "co_mg_m3",
+                "sensor_co",
+                "nmhc_ug_m3",
+                "benzene_ug_m3",
+                "sensor_nmhc",
+                "nox_ppb",
+                "sensor_nox",
+                "no2_ug_m3",
+                "sensor_no2",
+                "sensor_o3",
+                "temperature_c",
+                "relative_humidty",
+                "absolute_humidity")
+
 summary(data)
 ```
+```{r}
+str(data)
+```
+
+
+
+```{r}
+# percentage of null values per column
+sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
+```
+
+
+```{r}
+# Get the numerical columns from the data
+numerical_variables = names(data)[sapply(data, is.numeric)]
+numeric_data = data[, numerical_variables]
+
+numerical_variables
+numeric_data
+```
+
+
+```{r}
+# Function to plot the distribution of numerical columns, 
+# this column accepts a dataframe, the column name (name) and 
+# a clean parameter to plot the distribution while replacing -200 based on the method that is chosen (True, False, Mean, Median, Mode, Random sample from sample space)
+
+plot_numerical_distrbuition = function(df, name, clean = FALSE) {
+  x = df[[name]]
+  missing = which(x == -200)
+  # For the clean value we can add the imputation method we are looking for
+  if (clean == TRUE){ x = x[x != -200] }
+  if (clean == "Mean") { x[missing] = mean(x[x != -200], na.rm = TRUE)}
+  if (clean == "Median") { x[missing] = median(x[x != -200], na.rm = TRUE)}
+  if (clean == "Mode") { 
+    mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
+    x[missing] = as.numeric(mode_values)}
+  if (clean == "Random") {
+    set.seed(123)
+    x[missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+  tmp = data.frame(value = x)
+  
+  ggplot(tmp, aes(x = value)) +
+    geom_histogram(aes(y = ..density..),
+                   bins = 30,
+                   fill = "steelblue",
+                   alpha = 0.7) +
+    labs(title = paste("Distribution of", name),
+         x = name,
+         y = "Density") + 
+    theme_minimal()
+}
+```
+
+
+```{r}
+# Plotting distribution of raw data
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing disregarding -200 values
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = TRUE))
+}
+```
+```{r}
+# Plotting distribution replacing -200 values with mean
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mean"))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing -200 values with median
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Median"))
+}
+```
+
+
+```{r}
+# Plotting distribution replacing -200 values with mode
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mode"))
+}
+```
+```{r}
+# Plotting distribution replacing -200 values with random sample
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Random"))
+}
+```
+```{r}
+library(corrplot)
+numeric_data = data[, sapply(data, is.numeric)]
+numeric_data[numeric_data == -200] = NA
+numeric_data = numeric_data[complete.cases(numeric_data),]
+
+corr_matrix = cor(numeric_data)
+corrplot(corr_matrix, method = "color", tl.cex = 0.8)
+
+```
+```{r}
+pollutant_variables = c("co_mg_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
+independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
+```
+
+
+```{r}
+
+
+fill_missing_values = function(df, method = FALSE){
+  if (method == FALSE) return(df)
+  
+  set.seed(123)
+  
+  for (col in names(df)){
+    x = df[[col]]
+    if (is.numeric(x)){
+      missing = which(x == -200)
+      
+      if (length(missing) > 0) {
+        # For the method value we can add the imputation method we are looking for
+        if (method == "Mean") { df[[col]][missing] = mean(x[x != -200 || x != -174.5805070], na.rm = TRUE)}
+        if (method == "Median") { df[[col]][missing] = median(x[x != -200], na.rm = TRUE)}
+        if (method == "Mode") { 
+          mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
+          df[[col]][missing] = as.numeric(mode_values)}
+        if (method == "Random") {
+          set.seed(123)
+          df[[col]][missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+      }
+    }
+  }
+return(df)
+}
+  
+  
+
+model_trends_function = function(df, pollutant, variables, clean = FALSE) {
+  df = fill_missing_values(df, method = clean)
+  if (any(df == -200, na.rm = TRUE) == TRUE & clean != FALSE) return(print("there are still missing values"))
+  model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
+  print(pollutant)
+  print(clean)
+  model_trend = lm(model_formula,
+                   data = df)
+  summary(model_trend)}
+
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables))
+}
+
+```
+
+
+```{r}
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mean"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Mode"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Median"))
+}
+
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, clean = "Random"))
+}
+
+
+```
+
+
+```{r}
+replace_missing_values = function(x) {
+  valid_mean = mean(x[x != -200], na.rm = TRUE)
+  x[x == -200] = valid_mean
+  return(x)
+}
+for (poll in pollutant_variables) {
+  data[[poll]] = replace_missing_values(data[[poll]])
+}
+data$co_ppm = data$co_mg_m3 * 24.45 / 28.01
+data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
+```
+
+
+```{r}
+breakpoints = data.frame(pollutant = c("co", "co", "co", "co","co", "co", "no2", "no2", "no2", "no2", "no2", "no2", "benzene", "benzene", "benzene", "benzene","benzene", "benzene", "nox", "nox","nox", "nox","nox", "nox"),
+                         bp_low = c(0.0, 4.4, 9.4, 12.4, 15.4, 30.4, 0, 54, 101, 361, 650, 1250, 0, 5, 10, 20, 30, 50, 0, 53, 100, 360, 649, 1249),
+                         bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 54, 101, 361, 650, 1250, 2049, 5, 10, 20, 30, 50, 80, 53, 100, 360, 649, 1249, 2049),
+                         i_low = c(0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301),
+                         i_high = c(50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500))
+breakpoints
+```
+
+
+```{r}
+
+aqi_index = function(Cp, pollutant, breakpoints) {
+  bp = breakpoints[breakpoints$pollutant == pollutant & Cp >= breakpoints$bp_low & Cp <= breakpoints$bp_high, ]
+  
+  if (nrow(bp) ==0 || is.na(Cp)) return(NA_real_)
+  
+  bp = bp[1, ]
+  
+  I = (((bp$i_high - bp$i_low) / (bp$bp_high - bp$bp_low)) * (Cp - bp$bp_low)) + bp$i_low
+  return(I)
+}
+```
+
+
+
+
+```{r}
+plot_health_over_time <- function(df, health_col = "aqi_health",
+                                  time_unit = "day") {
+  library(ggplot2)
+  library(dplyr)
+  library(scales)
+
+  if (!health_col %in% names(df)) stop(paste("Column", health_col, "not found."))
+  if (!"datetime" %in% names(df)) stop("Column 'datetime' not found.")
+
+  plot_df <- df %>%
+    select(datetime, health = all_of(health_col)) %>%
+    filter(!is.na(health), !is.na(datetime))  # removes NA rows
+
+  if (time_unit == "day") {
+    plot_df <- plot_df %>% mutate(period = as.Date(datetime))
+  } else if (time_unit == "week") {
+    plot_df <- plot_df %>% mutate(period = as.Date(cut(as.Date(datetime), breaks = "week")))
+  } else if (time_unit == "month") {
+    plot_df <- plot_df %>% mutate(period = as.Date(format(datetime, "%Y-%m-01")))
+  } else {
+    stop("time_unit must be one of: 'day', 'week', 'month'")
+  }
+
+  summary_df <- plot_df %>%
+    count(period, health) %>%
+    group_by(period) %>%
+    mutate(proportion = n / sum(n)) %>%
+    ungroup()
+
+  ggplot(summary_df, aes(x = period, y = proportion, fill = health)) +
+    geom_area(alpha = 0.8, position = "stack") +
+    scale_fill_manual(values = c("healthy" = "steelblue", "not_healthy" = "tomato")) +  # fixed label
+    scale_y_continuous(labels = percent_format()) +
+    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+    labs(
+      title = paste("Health Status Over Time (by", time_unit, ")"),
+      x     = "Date",
+      y     = "Proportion",
+      fill  = "Health Status"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x     = element_text(angle = 45, hjust = 1),
+      legend.position = "top"
+    )
+}
+```
+
+
+```{r}
+plot_pollutants_by_health <- function(df, pollutants, health_col) {
+  library(ggplot2)
+  library(tidyr)
+  
+  long_df <- df %>%
+    select(all_of(pollutants), all_of(health_col)) %>%
+    pivot_longer(cols = all_of(pollutants),
+                 names_to = "pollutant",
+                 values_to = "value")
+  
+  ggplot(long_df, aes(x = value, fill = .data[[health_col]])) +
+    geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
+    facet_wrap(~ pollutant, scales = "free") +
+    scale_fill_manual(values = c("healthy" = "forestgreen",
+                                 "not_healthy" = "firebrick")) +
+    labs(
+      title = paste("Pollutant Distributions by", health_col),
+      x = "Concentration",
+      y = "Count",
+      fill = "Health Status"
+    ) +
+    theme_minimal()
+}
+
+```
+
+
+
+
+```{r}
+data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
+data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
+data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
+data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
+
+data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nox, na.rm = TRUE)
+data$aqi_health = ifelse(data$aqi <= 120, "healthy", "not_healthy")
+data
+table(data$aqi_health)
+
+plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
+
+pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
+plot_pollutants_by_health(data, pollutants, "aqi_health")
+```
+
+```{r}
+names(data)
+```
+
+```{r}
+data$healthy_co = ifelse(data$co_mg_m3 < 10, 1, 0)
+data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
+data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
+data$healthy_no2 = ifelse(data$no2_ug_m3 < 53, 1, 0)
+
+data$health_score = data$healthy_benzene + data$healthy_co + data$healthy_no2 + data$healthy_nox
+data$threshold_health = ifelse(data$health_score >= 2, "healthy", "not_healthy")
+
+table(data$threshold_health)
+
+plot_health_over_time(data, health_col = "threshold_health", time_unit = "month")
+
+plot_pollutants_by_health(data, pollutants, "threshold_health")
+```
+
