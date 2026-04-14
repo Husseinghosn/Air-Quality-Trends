@@ -32,6 +32,10 @@ str(data)
 
 ```{r}
 names(data)
+```
+
+```{r}
+names(data)
 numeric_data <- data[, sapply(data, is.numeric)]
 
 
@@ -49,6 +53,8 @@ rownames(table) <- NULL
 
 table
 ```
+
+
 # Part 1: Exploratory Data Analysis
 
 ## Q1. Summary Statistics
@@ -94,7 +100,6 @@ rownames(table) <- NULL
 
 table
 ```
-
 ```{r}
 str(data)
 ```
@@ -105,6 +110,21 @@ str(data)
 # percentage of null values per column
 sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
 ```
+```{r}
+# Date and Time that are NA
+cols_to_check <- setdiff(names(data), c("date", "time"))
+
+# Remove rows where both date and time are NA
+data <- data[!apply(is.na(data[cols_to_check]), 1, all), ]
+
+# Sensors are NA
+sensor_cols <- c("sensor_co", "sensor_nmhc", "sensor_nox", "sensor_no2", "sensor_o3")
+ 
+# Remove rows where all sensors are NA
+data <- data[!apply(is.na(data[sensor_cols]), 1, all), ]
+```
+
+
 
 
 ```{r}
@@ -203,7 +223,6 @@ corrplot(corr_matrix, method = "color", tl.cex = 0.8)
 
 ```
 
-
 ```{r}
 pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
 data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
@@ -245,7 +264,7 @@ impute_data = function(df, method = "median") {
 }
   
 
-model_trends_function_impute = function(df, pollutant, variables, method = "median") {
+model_trends_function = function(df, pollutant, variables, method = "median") {
   df <- impute_data(df, method = method)
   model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
   cat("\nPollutant:", pollutant, "\n")
@@ -256,133 +275,201 @@ model_trends_function_impute = function(df, pollutant, variables, method = "medi
 ```
 
 ```{r}
-methods <- c("mean", "median", "mode", "random")
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables))
+}
 
-for (m in methods){
-  for (col in pollutant_variables){
-    cat("METHOD:", toupper(m), "\n")
-    print(model_trends_function_impute(data, col, independent_variables, method = m))
-  }
+```
+
+
+```{r}
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Mean"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Mode"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Median"))
+}
+
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Random"))
+}
+
+
+```
+
+
+```{r}
+replace_missing_values = function(x) {
+  valid_mean = mean(x[x != -200], na.rm = TRUE)
+  x[is.na(x)] = valid_mean
+  return(x)
+}
+for (poll in pollutant_variables) {
+  data[[poll]] = replace_missing_values(data[[poll]])
+}
+data$co_ppm = data$co_ug_m3 * 24.45 / (28.01*1000)
+data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
+```
+
+
+```{r}
+breakpoints = data.frame(pollutant = c("co", "co", "co", "co","co", "co", "no2", "no2", "no2", "no2", "no2", "no2", "benzene", "benzene", "benzene", "benzene","benzene", "benzene", "nox", "nox","nox", "nox","nox", "nox"),
+                         bp_low = c(0.0, 4.4, 9.4, 12.4, 15.4, 30.4, 0, 54, 101, 361, 650, 1250, 0, 5, 10, 20, 30, 50, 0, 53, 100, 360, 649, 1249),
+                         bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 54, 101, 361, 650, 1250, 2049, 5, 10, 20, 30, 50, 80, 53, 100, 360, 649, 1249, 2049),
+                         i_low = c(0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301),
+                         i_high = c(50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500))
+breakpoints
+```
+
+
+```{r}
+
+aqi_index = function(Cp, pollutant, breakpoints) {
+  bp = breakpoints[breakpoints$pollutant == pollutant & Cp >= breakpoints$bp_low & Cp <= breakpoints$bp_high, ]
+  
+  if (nrow(bp) ==0 || is.na(Cp)) return(NA_real_)
+  
+  bp = bp[1, ]
+  
+  I = (((bp$i_high - bp$i_low) / (bp$bp_high - bp$bp_low)) * (Cp - bp$bp_low)) + bp$i_low
+  return(I)
 }
 ```
 
 
 
-```{r}
-data_impute_median <- impute_data(data, "median")
-data_impute_mean <- impute_data(data, "mean")
-data_impute_mode <- impute_data(data, "mode")
-data_impute_random <- impute_data(data, "random")
-
-
-ggplot(na.omit(data_impute_median), aes(x = datetime, y = co_ug_m3)) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = "CO Over Time (Impute median)")
-
-ggplot(na.omit(data_impute_mean), aes(x = datetime, y = co_ug_m3)) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = "CO Over Time (Impute mean)")
-
-ggplot(na.omit(data_impute_mode), aes(x = datetime, y = co_ug_m3)) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = "CO Over Time (Impute mode)")
-
-ggplot(na.omit(data_impute_random), aes(x = datetime, y = co_ug_m3)) +
-  geom_line() +
-  theme_minimal() +
-  labs(title = "CO Over Time (Impute random)")
-```
-
-
 
 ```{r}
-library(dplyr)
-data_zoom <- data_impute_median %>%
-  filter(datetime >= as.POSIXct("2004-03-01"),
-         datetime <= as.POSIXct("2004-03-31"))
+plot_health_over_time <- function(df, health_col = "aqi_health",
+                                  time_unit = "day") {
+  library(ggplot2)
+  library(dplyr)
+  library(scales)
 
-ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
-  geom_line() +
-  theme_minimal()
+  if (!health_col %in% names(df)) stop(paste("Column", health_col, "not found."))
+  if (!"datetime" %in% names(df)) stop("Column 'datetime' not found.")
 
-data_zoom <- data_impute_median %>%
-  filter(datetime >= as.POSIXct("2004-04-01"),
-         datetime <= as.POSIXct("2004-04-30"))
+  plot_df <- df %>%
+    select(datetime, health = all_of(health_col)) %>%
+    filter(!is.na(health), !is.na(datetime))  # removes NA rows
 
-ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
-  geom_line() +
-  theme_minimal()
+  if (time_unit == "day") {
+    plot_df <- plot_df %>% mutate(period = as.Date(datetime))
+  } else if (time_unit == "week") {
+    plot_df <- plot_df %>% mutate(period = as.Date(cut(as.Date(datetime), breaks = "week")))
+  } else if (time_unit == "month") {
+    plot_df <- plot_df %>% mutate(period = as.Date(format(datetime, "%Y-%m-01")))
+  } else {
+    stop("time_unit must be one of: 'day', 'week', 'month'")
+  }
 
-data_zoom <- data_impute_median %>%
-  filter(datetime >= as.POSIXct("2004-05-01"),
-         datetime <= as.POSIXct("2004-05-30"))
+  summary_df <- plot_df %>%
+    count(period, health) %>%
+    group_by(period) %>%
+    mutate(proportion = n / sum(n)) %>%
+    ungroup()
 
-ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
-  geom_line() +
-  theme_minimal()
-
-data_zoom <- data_impute_median %>%
-  filter(datetime >= as.POSIXct("2004-06-01"),
-         datetime <= as.POSIXct("2004-06-30"))
-
-ggplot(na.omit(data_zoom), aes(datetime, co_ug_m3)) +
-  geom_line() +
-  theme_minimal()
-```
-
-
-```{r}
-library(dplyr)
-data_impute <- data_impute %>%
-  mutate(
-    airstandard_co = 10,
-    airstandard_nmhc = 300,
-    airstandard_c6h6 = 5,
-    airstandard_nox = 100,
-    airstandard_no2 = 40
-  )
-
-data_impute <- data_impute %>%
-  mutate(
-    co_bad   = co_ug_m3 > airstandard_co,
-    nmhc_bad = nmhc_ug_m3 > airstandard_nmhc,
-    c6h6_bad = benzene_ug_m3 > airstandard_c6h6,
-    nox_bad  = nox_ppb > airstandard_nox,
-    no2_bad  = no2_ug_m3 > airstandard_no2
-  )
-
-data_impute <- data_impute %>%
-  mutate(
-    pollution_count = co_bad + nmhc_bad + c6h6_bad + nox_bad + no2_bad
-  )
-
-data_impute <- data_impute %>%
-  mutate(
-    air_quality = case_when(
-      pollution_count == 0 ~ "Healthy",
-      pollution_count == 1 ~ "Minor Pollution",
-      pollution_count <= 3 ~ "Polluted",
-      TRUE ~ "Major Pollution"
+  ggplot(summary_df, aes(x = period, y = proportion, fill = health)) +
+    geom_area(alpha = 0.8, position = "stack") +
+    scale_fill_manual(values = c("healthy" = "steelblue", "not_healthy" = "tomato")) +  # fixed label
+    scale_y_continuous(labels = percent_format()) +
+    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+    labs(
+      title = paste("Health Status Over Time (by", time_unit, ")"),
+      x     = "Date",
+      y     = "Proportion",
+      fill  = "Health Status"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x     = element_text(angle = 45, hjust = 1),
+      legend.position = "top"
     )
-  )
-
-```
-
-```{r}
-ggplot(data_impute, aes(x = air_quality)) +
-  geom_bar(fill = "steelblue") +
-  theme_minimal()
-```
-```{r}
-ggplot(data_impute, aes(datetime, fill = air_quality)) +
-  geom_histogram(binwidth = 86400) +  # daily bins
-  theme_minimal()
+}
 ```
 
 
 ```{r}
-sum(data_impute$exceed_8hr, na.rm = TRUE)
+plot_pollutants_by_health <- function(df, pollutants, health_col) {
+  library(ggplot2)
+  library(tidyr)
+  
+  long_df <- df %>%
+    select(all_of(pollutants), all_of(health_col)) %>%
+    pivot_longer(cols = all_of(pollutants),
+                 names_to = "pollutant",
+                 values_to = "value")
+  
+  ggplot(long_df, aes(x = value, fill = .data[[health_col]])) +
+    geom_histogram(alpha = 0.6, bins = 30, position = "identity") +
+    facet_wrap(~ pollutant, scales = "free") +
+    scale_fill_manual(values = c("healthy" = "forestgreen",
+                                 "not_healthy" = "firebrick")) +
+    labs(
+      title = paste("Pollutant Distributions by", health_col),
+      x = "Concentration",
+      y = "Count",
+      fill = "Health Status"
+    ) +
+    theme_minimal()
+}
+
+```
+
+
+
+
+```{r}
+data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
+data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
+data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
+data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
+
+data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nox, na.rm = TRUE)
+data$aqi_health = ifelse(data$aqi <= 120, "healthy", "not_healthy")
+data
+table(data$aqi_health)
+
+plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
+
+pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
+plot_pollutants_by_health(data, pollutants, "aqi_health")
+```
+
+```{r}
+names(data)
+na_counts <- sapply(data, function(x) sum(is.na(x)))
+na_counts
+```
+
+```{r}
+data$healthy_co = ifelse(data$co_ug_m3 < 10, 1, 0)
+data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
+data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
+data$healthy_no2 = ifelse(data$no2_ug_m3 < 53, 1, 0)
+
+data$health_score = data$healthy_benzene + data$healthy_co + data$healthy_no2 + data$healthy_nox
+data$threshold_health = ifelse(data$health_score >= 2, "healthy", "not_healthy")
+
+table(data$threshold_health)
+
+plot_health_over_time(data, health_col = "threshold_health", time_unit = "month")
+
+plot_pollutants_by_health(data, pollutants, "threshold_health")
 ```
