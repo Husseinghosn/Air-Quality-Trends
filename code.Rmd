@@ -85,21 +85,8 @@ names(data) = c("date",
                 "temperature_c",
                 "relative_humidty",
                 "absolute_humidity")
-
+data$nmhc_ug_m3 <- NULL
 numeric_data <- data[, sapply(data, is.numeric)]
-
-table <- data.frame(
-  Variable = names(numeric_data),
-  Min = sapply(numeric_data, function(x) min(x, na.rm = TRUE)),
-  Q1 = sapply(numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
-  Median = sapply(numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
-  Mean = sapply(numeric_data, function(x) mean(x, na.rm = TRUE)),
-  Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
-  Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
-)
-rownames(table) <- NULL
-
-table
 ```
 
 ```{r}
@@ -144,6 +131,7 @@ numerical_variables = names(clean_data)[sapply(clean_data, is.numeric)]
 null_count <- sapply(clean_data, function(x) sum(is.na(x)))
 null_count
 ```
+
 ```{r}
 clean_numeric_data <- clean_data[, sapply(clean_data, is.numeric)]
 
@@ -203,7 +191,7 @@ corrplot(corr_matrix, method = "color", tl.cex = 0.8)
 ```
 
 ```{r}
-pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+pollutant_variables = c("co_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
 clean_data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
 independent_variables = setdiff(names(clean_data), c(pollutant_variables, "date", "time"))
 
@@ -228,7 +216,6 @@ for (col in pollutant_variables){
 ## Part 2. Air Quality Index (AQI) Classification
 
 ```{r}
-
 clean_data$co_ppm = clean_data$co_ug_m3 * 24.45 / (28.01*1000)
 clean_data$no2_ppb = clean_data$no2_ug_m3 * 24.45 / 46.01
 ```
@@ -245,7 +232,6 @@ breakpoints
 
 
 ```{r}
-
 aqi_index = function(Cp, pollutant, breakpoints) {
   bp = breakpoints[breakpoints$pollutant == pollutant & Cp >= breakpoints$bp_low & Cp <= breakpoints$bp_high, ]
   
@@ -356,9 +342,8 @@ pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
 plot_pollutants_by_health(clean_data, pollutants, "aqi_health")
 ```
 
-
+#Q3. Model
 ```{r, echo=FALSE}
-
 #predicting AQI from only pollutants
 set.seed(123)  # For reproducibility
 aqi_index_trainingRowIndex <- sample(1:nrow(clean_data), 0.8 * nrow(data))  
