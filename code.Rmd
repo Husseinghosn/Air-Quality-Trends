@@ -1,9 +1,11 @@
 ---
 title: "Air-Quality-Trends"
+author: "Hussein Ghosin, Kazuma Bowring, Derrick Li"
+date: "2026-04-14"
 output: html_notebook
 ---
 
-
+# Download and read in dataset
 ```{r}
 library(readr)
 library(ggplot2)
@@ -18,26 +20,19 @@ data = data[, colSums(!is.na(data)) > 0]
 head(data)
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
-
-## Variables
+# Variables
 ```{r}
-str(data)
+dim(data)
 ```
-
 
 ```{r}
 names(data)
 ```
 
+# Summary of statistics prior to cleaning
 ```{r}
 names(data)
 numeric_data <- data[, sapply(data, is.numeric)]
-
 
 table <- data.frame(
   Variable = names(numeric_data),
@@ -48,16 +43,14 @@ table <- data.frame(
   Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
   Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
 )
-
 rownames(table) <- NULL
 
 table
 ```
 
-
 # Part 1: Exploratory Data Analysis
 
-## Q1. Summary Statistics
+# Q1. Summary Statistics of Clean Data
 ```{r}
 # Replace commas with dots and convert
 data$`CO(GT)` <- as.numeric(gsub(",", ".", data$`CO(GT)`))
@@ -67,6 +60,7 @@ data$RH <- as.numeric(gsub(",", ".", data$RH))
 data$AH <- as.numeric(gsub(",", ".", data$AH))
 data[data == -200] <- NA
 data$`CO(GT)` <- data$`CO(GT)` * 1000
+
 # Rename columns to make them understandable
 names(data) = c("date",
                 "time",
@@ -83,7 +77,7 @@ names(data) = c("date",
                 "temperature_c",
                 "relative_humidty",
                 "absolute_humidity")
-
+data$nmhc_ug_m3 <- NULL
 numeric_data <- data[, sapply(data, is.numeric)]
 
 table <- data.frame(
@@ -95,45 +89,34 @@ table <- data.frame(
   Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
   Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
 )
-
 rownames(table) <- NULL
 
 table
 ```
+
 ```{r}
-str(data)
+# Find null count for columns
+null_table = data.frame(column = names(data), null_count = colSums(is.na(data)))
+null_table
 ```
 
 
-
-```{r}
-# percentage of null values per column
-sapply(data, function(col) {mean(col == -200, na.rm = TRUE) * 100})
-```
 ```{r}
 # Date and Time that are NA
-cols_to_check <- setdiff(names(data), c("date", "time"))
+null_col <- setdiff(names(data), c("date", "time"))
 
 # Remove rows where both date and time are NA
-data <- data[!apply(is.na(data[cols_to_check]), 1, all), ]
+data <- data[!apply(is.na(data[null_col]), 1, all), ]
 
 # Sensors are NA
-sensor_cols <- c("sensor_co", "sensor_nmhc", "sensor_nox", "sensor_no2", "sensor_o3")
+null_sens <- c("sensor_co", "sensor_nmhc", "sensor_nox", "sensor_no2", "sensor_o3")
  
 # Remove rows where all sensors are NA
-data <- data[!apply(is.na(data[sensor_cols]), 1, all), ]
-```
+data <- data[!apply(is.na(data[null_sens]), 1, all), ]
 
-
-
-
-```{r}
-# Get the numerical columns from the data
-numerical_variables = names(data)[sapply(data, is.numeric)]
-numeric_data = data[, numerical_variables]
-
-numerical_variables
-numeric_data
+# emaining NA values will be imputed
+null_count <- sapply(data, function(x) sum(is.na(x)))
+null_count
 ```
 
 
@@ -141,20 +124,30 @@ numeric_data
 # Function to plot the distribution of numerical columns, 
 # this column accepts a dataframe, the column name (name) and 
 # a clean parameter to plot the distribution while replacing -200 based on the method that is chosen (True, False, Mean, Median, Mode, Random sample from sample space)
+numerical_variables <- names(data)[sapply(data, is.numeric)]
 
 plot_numerical_distrbuition = function(df, name, clean = FALSE) {
   x = df[[name]]
-  missing = which(x == -200)
-  # For the clean value we can add the imputation method we are looking for
-  if (clean == TRUE){ x = x[x != -200] }
-  if (clean == "Mean") { x[missing] = mean(x[x != -200], na.rm = TRUE)}
-  if (clean == "Median") { x[missing] = median(x[x != -200], na.rm = TRUE)}
+  missing = which(is.na(x))
+  
+  # Cleaning options
+  if (clean == TRUE){ 
+    x = x[!is.na(x)] 
+  }
+  if (clean == "Mean") { 
+    x[missing] = mean(x, na.rm = TRUE)
+  }
+  if (clean == "Median") { 
+    x[missing] = median(x, na.rm = TRUE)
+  }
   if (clean == "Mode") { 
-    mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
-    x[missing] = as.numeric(mode_values)}
+    mode_values = names(sort(table(x), decreasing = TRUE))[1]
+    x[missing] = as.numeric(mode_values)
+  }
   if (clean == "Random") {
     set.seed(123)
-    x[missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+    x[missing] = sample(x[!is.na(x)], length(missing), replace = TRUE)
+  }
   tmp = data.frame(value = x)
   
   ggplot(tmp, aes(x = value)) +
@@ -170,22 +163,15 @@ plot_numerical_distrbuition = function(df, name, clean = FALSE) {
 ```
 
 
+#Q2. Effects of imputation on distribution plots
 ```{r}
-# Plotting distribution of raw data
-for (col in numerical_variables){
-  print(plot_numerical_distrbuition(data, col))
-}
-```
-
-
-```{r}
-# Plotting distribution replacing disregarding -200 values
+# Plotting distribution replacing disregarding null values
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = TRUE))
 }
 ```
 ```{r}
-# Plotting distribution replacing -200 values with mean
+# Plotting distribution replacing null values with mean
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Mean"))
 }
@@ -193,7 +179,7 @@ for (col in numerical_variables){
 
 
 ```{r}
-# Plotting distribution replacing -200 values with median
+# Plotting distribution replacing null values with median
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Median"))
 }
@@ -201,13 +187,13 @@ for (col in numerical_variables){
 
 
 ```{r}
-# Plotting distribution replacing -200 values with mode
+# Plotting distribution replacing null values with mode
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Mode"))
 }
 ```
 ```{r}
-# Plotting distribution replacing -200 values with random sample
+# Plotting distribution replacing null values with random sample
 for (col in numerical_variables){
   print(plot_numerical_distrbuition(data, col, clean = "Random"))
 }
@@ -224,7 +210,7 @@ corrplot(corr_matrix, method = "color", tl.cex = 0.8)
 ```
 
 ```{r}
-pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+pollutant_variables = c("co_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
 data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
 independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
 
@@ -236,30 +222,24 @@ impute_data = function(df, method = "median") {
       x <- df_copy[[col]]
       missing <- which(is.na(x))
       if (length(missing) > 0) {
-        
         if (method == "mean") {
           x[missing] <- mean(x, na.rm = TRUE)
         }
-        
         if (method == "median") {
           x[missing] <- median(x, na.rm = TRUE)
         }
-        
         if (method == "mode") {
           mode_val <- as.numeric(names(sort(table(x), decreasing = TRUE)[1]))
           x[missing] <- mode_val
         }
-        
         if (method == "random") {
           set.seed(123)
           x[missing] <- sample(x[!is.na(x)], length(missing), replace = TRUE)
         }
-        
         df_copy[[col]] <- x
       }
     }
   }
-  
   return(df_copy)
 }
   
@@ -274,11 +254,11 @@ model_trends_function = function(df, pollutant, variables, method = "median") {
 }
 ```
 
+# Q3. Effects of Imputation of Summary
 ```{r}
 for (col in pollutant_variables){
   print(model_trends_function(data, col, independent_variables))
 }
-
 ```
 
 
@@ -313,10 +293,11 @@ for (col in pollutant_variables){
 
 ```
 
+## Part 2. Air Quality Index (AQI) Classification
 
 ```{r}
 replace_missing_values = function(x) {
-  valid_mean = mean(x[x != -200], na.rm = TRUE)
+  valid_mean = mean(x, na.rm = TRUE)
   x[is.na(x)] = valid_mean
   return(x)
 }
@@ -351,8 +332,6 @@ aqi_index = function(Cp, pollutant, breakpoints) {
   return(I)
 }
 ```
-
-
 
 
 ```{r}
@@ -450,12 +429,6 @@ plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
 
 pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
 plot_pollutants_by_health(data, pollutants, "aqi_health")
-```
-
-```{r}
-names(data)
-na_counts <- sapply(data, function(x) sum(is.na(x)))
-na_counts
 ```
 
 ```{r}
