@@ -34,7 +34,7 @@ str(data)
 ```
 
 ```{r}
-names(data)
+dim(data)
 ```
 
 # Summary of statistics prior to cleaning
@@ -144,6 +144,22 @@ numerical_variables = names(clean_data)[sapply(clean_data, is.numeric)]
 null_count <- sapply(clean_data, function(x) sum(is.na(x)))
 null_count
 ```
+```{r}
+clean_numeric_data <- clean_data[, sapply(clean_data, is.numeric)]
+
+clean_table <- data.frame(
+  Variable = names(clean_numeric_data),
+  Min = sapply(clean_numeric_data, function(x) min(x, na.rm = TRUE)),
+  Q1 = sapply(clean_numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(clean_numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
+  Mean = sapply(clean_numeric_data, function(x) mean(x, na.rm = TRUE)),
+  Q3 = sapply(clean_numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Max = sapply(clean_numeric_data, function(x) max(x, na.rm = TRUE))
+)
+rownames(clean_table) <- NULL
+
+clean_table
+```
 
 
 ```{r}
@@ -156,8 +172,7 @@ plot_numerical_distrbuition = function(df, name) {
   tmp = data.frame(value = x)
   
   ggplot(tmp, aes(x = value)) +
-    geom_histogram(aes(y = ..density..),
-                   bins = 30,
+    geom_histogram(bins = 30,
                    fill = "steelblue",
                    alpha = 0.7) +
     labs(title = paste("Distribution of", name),
