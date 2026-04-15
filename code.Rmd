@@ -1,9 +1,17 @@
 ---
 title: "Air-Quality-Trends"
+author: "Hussein Ghosin, Kazuma Bowring, Derrick Li"
+date: "2026-04-14"
 output: html_notebook
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE, message = FALSE)
+#Warning - false, message=false removes warning for package being installed
+```
 
+
+# Download and read in dataset
 ```{r}
 library(readr)
 library(ggplot2)
@@ -18,9 +26,37 @@ data = data[, colSums(!is.na(data)) > 0]
 head(data)
 ```
 
+# Variables
+```{r}
+str(data)
+```
+
+```{r}
+names(data)
+```
+
+# Summary of statistics prior to cleaning
+```{r}
+names(data)
+numeric_data <- data[, sapply(data, is.numeric)]
+
+table <- data.frame(
+  Variable = names(numeric_data),
+  Min = sapply(numeric_data, function(x) min(x, na.rm = TRUE)),
+  Q1 = sapply(numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
+  Mean = sapply(numeric_data, function(x) mean(x, na.rm = TRUE)),
+  Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
+)
+rownames(table) <- NULL
+
+table
+```
+
 # Part 1: Exploratory Data Analysis
 
-## Q1. Summary Statistics
+# Q1. Summary Statistics of Clean Data
 ```{r}
 # Replace commas with dots and convert
 data$`CO(GT)` <- as.numeric(gsub(",", ".", data$`CO(GT)`))
@@ -28,11 +64,13 @@ data$`C6H6(GT)` <- as.numeric(gsub(",", ".", data$`C6H6(GT)`))
 data$T <- as.numeric(gsub(",", ".", data$T))
 data$RH <- as.numeric(gsub(",", ".", data$RH))
 data$AH <- as.numeric(gsub(",", ".", data$AH))
+data[data == -200] <- NA
+data$`CO(GT)` <- data$`CO(GT)` * 1000
 
 # Rename columns to make them understandable
 names(data) = c("date",
                 "time",
-                "co_mg_m3",
+                "co_ug_m3",
                 "sensor_co",
                 "nmhc_ug_m3",
                 "benzene_ug_m3",
@@ -46,20 +84,45 @@ names(data) = c("date",
                 "relative_humidty",
                 "absolute_humidity")
 
-summary(data)
+numeric_data <- data[, sapply(data, is.numeric)]
+
+table <- data.frame(
+  Variable = names(numeric_data),
+  Min = sapply(numeric_data, function(x) min(x, na.rm = TRUE)),
+  Q1 = sapply(numeric_data, function(x) quantile(x, 0.25, na.rm = TRUE)),
+  Median = sapply(numeric_data, function(x) quantile(x, 0.5, na.rm = TRUE)),
+  Mean = sapply(numeric_data, function(x) mean(x, na.rm = TRUE)),
+  Q3 = sapply(numeric_data, function(x) quantile(x, 0.75, na.rm = TRUE)),
+  Max = sapply(numeric_data, function(x) max(x, na.rm = TRUE))
+)
+rownames(table) <- NULL
+
+table
+```
+
+```{r}
+# Find null count for columns
+null_table = data.frame(column = names(data), null_count = colSums(is.na(data)))
+null_table
 ```
 
 
-
-
-
 ```{r}
-# Get the numerical columns from the data
-numerical_variables = names(data)[sapply(data, is.numeric)]
-numeric_data = data[, numerical_variables]
+# Date and Time that are NA
+null_col <- setdiff(names(data), c("date", "time"))
 
-numerical_variables
-numeric_data
+# Remove rows where both date and time are NA
+data <- data[!apply(is.na(data[null_col]), 1, all), ]
+
+# Sensors are NA
+null_sens <- c("sensor_co", "sensor_nmhc", "sensor_nox", "sensor_no2", "sensor_o3")
+ 
+# Remove rows where all sensors are NA
+data <- data[!apply(is.na(data[null_sens]), 1, all), ]
+
+# emaining NA values will be imputed
+null_count <- sapply(data, function(x) sum(is.na(x)))
+null_count
 ```
 
 
@@ -70,17 +133,26 @@ numeric_data
 
 plot_numerical_distrbuition = function(df, name, clean = FALSE) {
   x = df[[name]]
-  missing = which(x == -200)
-  # For the clean value we can add the imputation method we are looking for
-  if (clean == TRUE){ x = x[x != -200] }
-  if (clean == "Mean") { x[missing] = mean(x[x != -200], na.rm = TRUE)}
-  if (clean == "Median") { x[missing] = median(x[x != -200], na.rm = TRUE)}
+  missing = which(is.na(x))
+  
+  # Cleaning options
+  if (clean == TRUE){ 
+    x = x[!is.na(x)] 
+  }
+  if (clean == "Mean") { 
+    x[missing] = mean(x, na.rm = TRUE)
+  }
+  if (clean == "Median") { 
+    x[missing] = median(x, na.rm = TRUE)
+  }
   if (clean == "Mode") { 
-    mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
-    x[missing] = as.numeric(mode_values)}
+    mode_values = names(sort(table(x), decreasing = TRUE))[1]
+    x[missing] = as.numeric(mode_values)
+  }
   if (clean == "Random") {
     set.seed(123)
-    x[missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+    x[missing] = sample(x[!is.na(x)], length(missing), replace = TRUE)
+  }
   tmp = data.frame(value = x)
   
   ggplot(tmp, aes(x = value)) +
@@ -96,88 +168,161 @@ plot_numerical_distrbuition = function(df, name, clean = FALSE) {
 ```
 
 
-
-
+#Q2. Effects of imputation on distribution plots
 ```{r}
-pollutant_variables = c("co_mg_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
-data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
-independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
+# Plotting distribution replacing disregarding null values
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = TRUE))
+}
+```
+```{r}
+# Plotting distribution replacing null values with mean
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mean"))
+}
 ```
 
 
 ```{r}
+# Plotting distribution replacing null values with median
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Median"))
+}
+```
 
 
-fill_missing_values = function(df, method = FALSE){
-  if (method == FALSE) return(df)
-  
-  set.seed(123)
-  
-  for (col in names(df)){
-    x = df[[col]]
-    if (is.numeric(x)){
-      missing = which(x == -200)
-      
+```{r}
+# Plotting distribution replacing null values with mode
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Mode"))
+}
+```
+```{r}
+# Plotting distribution replacing null values with random sample
+for (col in numerical_variables){
+  print(plot_numerical_distrbuition(data, col, clean = "Random"))
+}
+```
+```{r}
+library(corrplot)
+numeric_data = data[, sapply(data, is.numeric)]
+numeric_data[numeric_data == -200] = NA
+numeric_data = numeric_data[complete.cases(numeric_data),]
+
+corr_matrix = cor(numeric_data)
+corrplot(corr_matrix, method = "color", tl.cex = 0.8)
+
+```
+
+```{r}
+pollutant_variables = c("co_ug_m3", "nmhc_ug_m3", "benzene_ug_m3", "nox_ppb", "no2_ug_m3")
+data$datetime = as.POSIXct(paste(data$date, data$time), format = "%d/%m/%Y %H.%M.%S")
+independent_variables = setdiff(names(data), c(pollutant_variables, "date", "time"))
+
+## Median is defaulted as impute_data function
+impute_data = function(df, method = "median") {
+  df_copy <- df
+  for (col in names(df_copy)) {
+    if (is.numeric(df_copy[[col]])) {
+      x <- df_copy[[col]]
+      missing <- which(is.na(x))
       if (length(missing) > 0) {
-        # For the method value we can add the imputation method we are looking for
-        if (method == "Mean") { df[[col]][missing] = mean(x[x != -200 || x != -174.5805070], na.rm = TRUE)}
-        if (method == "Median") { df[[col]][missing] = median(x[x != -200], na.rm = TRUE)}
-        if (method == "Mode") { 
-          mode_values = names(sort(table(x[x != -200]), decreasing = TRUE))[1]
-          df[[col]][missing] = as.numeric(mode_values)}
-        if (method == "Random") {
+        if (method == "mean") {
+          x[missing] <- mean(x, na.rm = TRUE)
+        }
+        if (method == "median") {
+          x[missing] <- median(x, na.rm = TRUE)
+        }
+        if (method == "mode") {
+          mode_val <- as.numeric(names(sort(table(x), decreasing = TRUE)[1]))
+          x[missing] <- mode_val
+        }
+        if (method == "random") {
           set.seed(123)
-          df[[col]][missing] = sample(x[x != -200], length(missing), replace = TRUE)}
+          x[missing] <- sample(x[!is.na(x)], length(missing), replace = TRUE)
+        }
+        df_copy[[col]] <- x
       }
     }
   }
-return(df)
+  return(df_copy)
 }
   
-  
 
-model_trends_function = function(df, pollutant, variables, clean = FALSE) {
-  df = fill_missing_values(df, method = clean)
-  if (any(df == -200, na.rm = TRUE) == TRUE & clean != FALSE) return(print("there are still missing values"))
+model_trends_function = function(df, pollutant, variables, method = "median") {
+  df <- impute_data(df, method = method)
   model_formula = as.formula(paste(pollutant, "~", paste(variables, collapse = "+")))
-  print(pollutant)
-  print(clean)
-  model_trend = lm(model_formula,
-                   data = df)
-  summary(model_trend)}
+  cat("\nPollutant:", pollutant, "\n")
+  cat("Impute Method:", method, "\n")
+  model_trend = lm(model_formula, data = df)
+  summary(model_trend)
+}
+```
 
-
+# Q3. Effects of Imputation of Summary
+```{r}
 for (col in pollutant_variables){
   print(model_trends_function(data, col, independent_variables))
+}
+```
+
+
+```{r}
+
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Mean"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Mode"))
+}
+```
+
+
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Median"))
 }
 
 ```
 
 
+```{r}
+for (col in pollutant_variables){
+  print(model_trends_function(data, col, independent_variables, method = "Random"))
+}
 
+
+```
+
+## Part 2. Air Quality Index (AQI) Classification
 
 ```{r}
 replace_missing_values = function(x) {
-  valid_mean = mean(x[x != -200], na.rm = TRUE)
-  x[x == -200] = valid_mean
+  valid_mean = mean(x, na.rm = TRUE)
+  x[is.na(x)] = valid_mean
   return(x)
 }
 for (poll in pollutant_variables) {
   data[[poll]] = replace_missing_values(data[[poll]])
 }
-data$co_ppm = data$co_mg_m3 * 24.45 / 28.01
+data$co_ppm = data$co_ug_m3 * 24.45 / (28.01*1000)
 data$no2_ppb = data$no2_ug_m3 * 24.45 / 46.01
 ```
 
 
 ```{r}
-breakpoints = data.frame(pollutant = c("co", "co", "no2", "no2", "benzene", "benzene", "nox", "nox"),
-                         bp_low = c(0.0, 4.5, 0, 54, 0, 1, 0, 54),
-                         bp_high = c(4.4, 9.4, 53, 100, 1, 3,  53, 100),
-                         i_low = c(0, 51, 0, 51, 0, 51, 0, 51),
-                         i_high = c(50, 100, 50, 100, 50, 100, 50, 100))
+breakpoints = data.frame(pollutant = c("co", "co", "co", "co","co", "co", "no2", "no2", "no2", "no2", "no2", "no2", "benzene", "benzene", "benzene", "benzene","benzene", "benzene", "nox", "nox","nox", "nox","nox", "nox"),
+                         bp_low = c(0.0, 4.4, 9.4, 12.4, 15.4, 30.4, 0, 54, 101, 361, 650, 1250, 0, 5, 10, 20, 30, 50, 0, 53, 100, 360, 649, 1249),
+                         bp_high = c(4.4, 9.4, 12.4, 15.4, 30.4, 40.4, 54, 101, 361, 650, 1250, 2049, 5, 10, 20, 30, 50, 80, 53, 100, 360, 649, 1249, 2049),
+                         i_low = c(0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301, 0, 51, 101, 151, 201, 301),
+                         i_high = c(50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500, 50, 100, 150, 200, 300, 500))
 breakpoints
 ```
+
 
 ```{r}
 
@@ -192,8 +337,6 @@ aqi_index = function(Cp, pollutant, breakpoints) {
   return(I)
 }
 ```
-
-
 
 
 ```{r}
@@ -247,10 +390,6 @@ plot_health_over_time <- function(df, health_col = "aqi_health",
 
 
 ```{r}
-unique(data$aqi_health)
-unique(data$threshold_health)
-```
-```{r}
 plot_pollutants_by_health <- function(df, pollutants, health_col) {
   library(ggplot2)
   library(tidyr)
@@ -279,6 +418,7 @@ plot_pollutants_by_health <- function(df, pollutants, health_col) {
 
 
 
+
 ```{r}
 data$i_co = sapply(data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
 data$i_no2 = sapply(data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
@@ -286,8 +426,8 @@ data$i_benzene = sapply(data$benzene_ug_m3, aqi_index, pollutant = "benzene", br
 data$i_nox = sapply(data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
 
 data$aqi = pmax(data$i_co, data$i_no2, data$i_benzene, data$i_nox, na.rm = TRUE)
-data$aqi_health = ifelse(data$aqi <= 70, "healthy", "not_healthy")
-
+data$aqi_health = ifelse(data$aqi <= 120, "healthy", "not_healthy")
+data
 table(data$aqi_health)
 
 plot_health_over_time(data, health_col = "aqi_health", time_unit = "month")
@@ -296,9 +436,8 @@ pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
 plot_pollutants_by_health(data, pollutants, "aqi_health")
 ```
 
-
 ```{r}
-data$healthy_co = ifelse(data$co_mg_m3 < 10, 1, 0)
+data$healthy_co = ifelse(data$co_ug_m3 < 10, 1, 0)
 data$healthy_benzene = ifelse(data$benzene_ug_m3 < 5, 1, 0)
 data$healthy_nox = ifelse(data$nox_ppb < 53, 1, 0)
 data$healthy_no2 = ifelse(data$no2_ug_m3 < 53, 1, 0)
@@ -312,16 +451,65 @@ plot_health_over_time(data, health_col = "threshold_health", time_unit = "month"
 
 plot_pollutants_by_health(data, pollutants, "threshold_health")
 ```
+```{r, echo=FALSE}
+
+#predicting AQI from only pollutants
+set.seed(123)  # For reproducibility
+aqi_index_trainingRowIndex <- sample(1:nrow(data), 0.8 * nrow(data))  
+aqi_index_train_data <- data[aqi_index_trainingRowIndex, ]
+aqi_index_test_data  <- data[-aqi_index_trainingRowIndex, ]
+
+model1_aqi_index <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = aqi_index_train_data)
+#summary(model1_aqi_index)
+predictions <- predict(model1_aqi_index, aqi_index_test_data)
+#predictions
+
+#Calculate CorrelationAccuracy 0 means bad or none, 1 is strong/good
+actuals_preds <- data.frame(cbind(actual = (test_data$co_ppm+test_data$benzene_ug_m3+test_data$nox_ppb+test_data$no2_ppb), predicted = predictions))
+correlation_accuracy <- cor(actuals_preds)
+correlation_accuracy
+#Calculate RMSE Root mean squared results vary base on variance of data range RMSE of 10 for 0-30 is bad, but good for 400-5000, being largely over the maximum value we get is ba
+rmse <- sqrt(mean((actuals_preds$actual - actuals_preds$predicted)^2))
+rmse
+```
+```{r, echo=FALSE}
+#predicting AQI from pollutants and interaction variables
+set.seed(123)  # For reproducibility
+aqi_index_trainingRowIndex_humidityntemp <- sample(1:nrow(data), 0.8 * nrow(data))  
+aqi_index_train_data_humidityntemp <- data[aqi_index_trainingRowIndex_humidityntemp, ]
+aqi_index_test_data_humidityntemp  <- data[-aqi_index_trainingRowIndex_humidityntemp, ]
+
+model1_aqi_index_humidityntemp <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = aqi_index_train_data_humidityntemp)
+#summary(model1_aqi_index)
+predictions_humidityntemp <- predict(model1_aqi_index_humidityntemp, aqi_index_test_data_humidityntemp)
+#predictions
+
+#Calculate CorrelationAccuracy 0 means bad or none, 1 is strong/good
+actuals_preds_humidityntemp <- data.frame(cbind(actual = (aqi_index_test_data_humidityntemp$co_ppm+
+                                                       aqi_index_test_data_humidityntemp$benzene_ug_m3+
+                                                       aqi_index_test_data_humidityntemp$nox_ppb+
+                                                       aqi_index_test_data_humidityntemp$no2_ppb+
+                                                       aqi_index_test_data_humidityntemp$temperature_c+
+                                                       aqi_index_test_data_humidityntemp$relative_humidty+
+                                                       aqi_index_test_data_humidityntemp$absolute_humidity)^2, predicted = predictions))
+correlation_accuracy_humidityntemp <- cor(actuals_preds_humidityntemp)
+correlation_accuracy_humidityntemp
+#Calculate RMSE Root mean squared results vary base on variance of data range RMSE of 10 for 0-30 is bad, but good for 400-5000, being largely over the maximum value we get is ba
+rmse <- sqrt(mean((actuals_preds$actual - actuals_preds$predicted)^2))
+rmse
+
+```
 
 ```{r, echo=FALSE}
 #DO note AIC's may be large simply because our sample is massive, so a large VIF doesnt mean its bad
 #generalized linear model predicting aqi_health in response to pollutants omitting n/a results and predictors
 #str(data)
-glm_fit_pollutants_aqi_healthy<- glm(as.factor(data$aqi_health) ~ co_mg_m3+benzene_ug_m3+nox_ppb+no2_ug_m3, data = data,family = binomial,na.action = na.omit)
+data_remove_outlier <-  data
+glm_fit_pollutants_aqi_healthy<- glm(as.factor(data$aqi_health) ~ co_ug_m3+benzene_ug_m3+nox_ppb+no2_ug_m3, data = data_remove_outlier,family = binomial,na.action = na.omit)
 summary(glm_fit_pollutants_aqi_healthy)
 plot(glm_fit_pollutants_aqi_healthy)
 aic_glm_fit_pollutants_aqi_healthy<- AIC(glm_fit_pollutants_aqi_healthy)
-
+print(paste("the AIC value of this GLM is ", aic_glm_fit_pollutants_aqi_healthy))
 ```
 
 ```{r, echo=FALSE}
@@ -330,7 +518,44 @@ lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+no2_ppb+i_co+i_no2+i_benzene+i_nox,
 summary(lm_fit_aqi_pollutants_aqi)
 plot(lm_fit_aqi_pollutants_aqi)
 aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
+print(paste("the AIC value of this LM (AQI prediction based on pollutant AQI) is ", aic_lm_aqi_pollutants_aqi))
 ```
+```{r, echo=FALSE}
+#linear model predicting aqi based on pollutants omitting na values from linear modelling,
+lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = data, na.action = na.omit)
+summary(lm_fit_aqi_pollutants_aqi)
+plot(lm_fit_aqi_pollutants_aqi)
+aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
+print(paste("the AIC value of this LM (AQI prediction based on pollutant ) is ", aic_lm_aqi_pollutants_aqi))
+```
+```{r, echo=FALSE}
+#for VIF
+#install.packages("car")
+library(car)
+
+#linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
+lm_fit_aqi_vs_pollutants_temp_humid <- lm(aqi ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = data, na.action = na.omit)
+summary(lm_fit_aqi_vs_pollutants_temp_humid)
+plot(lm_fit_aqi_vs_pollutants_temp_humid)
+aic_lm_aqi_pollutants_humidity_aq <- AIC(lm_fit_aqi_vs_pollutants_temp_humid)
+print(paste("the AIC value of this LM (AQI prediction based on pollutant and temperature + humidities) is ", aic_lm_aqi_pollutants_humidity_aq))
+vif_lm_fit_aqi_vs_pollutants_temp_humid <- vif(lm_fit_aqi_vs_pollutants_temp_humid,type=c("predictor"))
+print(paste("the GVIF^(1/(2*Df)) value of this LM (AQI prediction based on pollutant and temperature + humidities) is 1"))
+#VIF's return 1 for GVIF^(1/(2*Df)) = low multicollinearity
+#Vif's return 1 as well for GVIF, this is our RAW VIF
+```
+```{r, echo=FALSE}
+#VIF library (car) in previous code block
+
+# GENERALIZED linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
+glm_fit_aqi_vs_pollutants_temp_humid <- glm(as.factor(data$aqi_health) ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = data, family = binomial,na.action = na.omit)
+summary(glm_fit_aqi_vs_pollutants_temp_humid)
+plot(glm_fit_aqi_vs_pollutants_temp_humid)
+aic_glm_aqi_pollutants_aqi <- AIC(glm_fit_aqi_vs_pollutants_temp_humid)
+#vif_glm_fit_aqi_vs_pollutants_temp_humid <- vif(glm_fit_aqi_vs_pollutants_temp_humid,type=c("predictor"))
+
+```
+
 ```{r, echo=FALSE}
 #linear model predicting aqi based on pollutants omitting na values from linear modelling,
 lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = data, na.action = na.omit)
