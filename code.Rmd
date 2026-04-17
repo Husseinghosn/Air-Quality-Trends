@@ -219,6 +219,7 @@ for (col in pollutant_variables){
 ```{r, comment=""}
 clean_data$co_ppm = clean_data$co_ug_m3 * 24.45 / (28.01*1000)
 clean_data$no2_ppb = clean_data$no2_ug_m3 * 24.45 / 46.01
+clean_data$benzene_ppb = clean_data$benzene_ug_m3 * 24.45 / 78.11
 ```
 
 
@@ -329,7 +330,7 @@ plot_pollutants_by_health <- function(df, pollutants, health_col) {
 ```{r, comment=""}
 clean_data$i_co = sapply(clean_data$co_ppm, aqi_index, pollutant = "co", breakpoints = breakpoints)
 clean_data$i_no2 = sapply(clean_data$no2_ppb, aqi_index, pollutant = "no2", breakpoints = breakpoints)
-clean_data$i_benzene = sapply(clean_data$benzene_ug_m3, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
+clean_data$i_benzene = sapply(clean_data$benzene_ppb, aqi_index, pollutant = "benzene", breakpoints = breakpoints)
 clean_data$i_nox = sapply(clean_data$nox_ppb, aqi_index, pollutant = "nox", breakpoints = breakpoints)
 
 clean_data$aqi = pmax(clean_data$i_co, clean_data$i_no2, clean_data$i_benzene, clean_data$i_nox, na.rm = TRUE)
@@ -373,7 +374,7 @@ aqi_index_trainingRowIndex_humidityntemp <- sample(1:nrow(clean_data), 0.8 * nro
 aqi_index_train_data_humidityntemp <- clean_data[aqi_index_trainingRowIndex_humidityntemp, ]
 aqi_index_test_data_humidityntemp  <- clean_data[-aqi_index_trainingRowIndex_humidityntemp, ]
 
-model1_aqi_index_humidityntemp <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = aqi_index_train_data_humidityntemp)
+model1_aqi_index_humidityntemp <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = aqi_index_train_data_humidityntemp)
 #summary(model1_aqi_index)
 predictions_humidityntemp <- predict(model1_aqi_index_humidityntemp, aqi_index_test_data_humidityntemp)
 #predictions
@@ -400,7 +401,7 @@ rmse
 #generalized linear model predicting aqi_health in response to pollutants omitting n/a results and predictors
 #str(data)
 data_remove_outlier <-  clean_data
-glm_fit_pollutants_aqi_healthy<- glm(as.factor(clean_data$aqi_health) ~ co_ug_m3+benzene_ug_m3+nox_ppb+no2_ug_m3, data = data_remove_outlier,family = binomial,na.action = na.omit)
+glm_fit_pollutants_aqi_healthy<- glm(as.factor(clean_data$aqi_health) ~ co_ug_m3+benzene_ppb+nox_ppb+no2_ug_m3, data = data_remove_outlier,family = binomial,na.action = na.omit)
 summary(glm_fit_pollutants_aqi_healthy)
 plot(glm_fit_pollutants_aqi_healthy)
 aic_glm_fit_pollutants_aqi_healthy<- AIC(glm_fit_pollutants_aqi_healthy)
@@ -419,7 +420,7 @@ print(paste("the AIC value of this LM (AQI prediction based on pollutant AQI) is
 
 ```{r, echo=FALSE, comment=""}
 #linear model predicting aqi based on pollutants omitting na values from linear modelling,
-lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
+lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_pollutants_aqi)
 plot(lm_fit_aqi_pollutants_aqi)
 aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
@@ -432,7 +433,7 @@ print(paste("the AIC value of this LM (AQI prediction based on pollutant ) is ",
 library(car)
 
 #linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
-lm_fit_aqi_vs_pollutants_temp_humid <- lm(aqi ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, na.action = na.omit)
+lm_fit_aqi_vs_pollutants_temp_humid <- lm(aqi ~ (co_ppm+benzene_ppb+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_vs_pollutants_temp_humid)
 plot(lm_fit_aqi_vs_pollutants_temp_humid)
 aic_lm_aqi_pollutants_humidity_aq <- AIC(lm_fit_aqi_vs_pollutants_temp_humid)
@@ -447,7 +448,7 @@ print(paste("the GVIF^(1/(2*Df)) value of this LM (AQI prediction based on pollu
 #VIF library (car) in previous code block
 
 # GENERALIZED linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
-glm_fit_aqi_vs_pollutants_temp_humid <- glm(as.factor(clean_data$aqi_health) ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, family = binomial,na.action = na.omit)
+glm_fit_aqi_vs_pollutants_temp_humid <- glm(as.factor(clean_data$aqi_health) ~ (co_ppm+benzene_ppb+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, family = binomial,na.action = na.omit)
 summary(glm_fit_aqi_vs_pollutants_temp_humid)
 plot(glm_fit_aqi_vs_pollutants_temp_humid)
 aic_glm_aqi_pollutants_aqi <- AIC(glm_fit_aqi_vs_pollutants_temp_humid)
@@ -457,7 +458,7 @@ aic_glm_aqi_pollutants_aqi <- AIC(glm_fit_aqi_vs_pollutants_temp_humid)
 
 ```{r, echo=FALSE, comment=""}
 #linear model predicting aqi based on pollutants omitting na values from linear modelling,
-lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
+lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_pollutants_aqi)
 plot(lm_fit_aqi_pollutants_aqi)
 aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
@@ -469,7 +470,7 @@ aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
 library(car)
 
 #linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
-lm_fit_aqi_vs_pollutants_temp_humid <- lm(aqi ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, na.action = na.omit)
+lm_fit_aqi_vs_pollutants_temp_humid <- lm(aqi ~ (co_ppm+benzene_ppb+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_vs_pollutants_temp_humid)
 plot(lm_fit_aqi_vs_pollutants_temp_humid)
 aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_vs_pollutants_temp_humid)
@@ -482,7 +483,7 @@ vif_lm_fit_aqi_vs_pollutants_temp_humid <- vif(lm_fit_aqi_vs_pollutants_temp_hum
 #VIF library (car) in previous code block
 
 # GENERALIZED linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
-glm_fit_aqi_vs_pollutants_temp_humid <- glm(as.factor(clean_data$aqi_health) ~ (co_ppm+benzene_ug_m3+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, family = binomial,na.action = na.omit)
+glm_fit_aqi_vs_pollutants_temp_humid <- glm(as.factor(clean_data$aqi_health) ~ (co_ppm+benzene_ppb+nox_ppb+no2_ppb+temperature_c+relative_humidty+absolute_humidity)^2, data = clean_data, family = binomial,na.action = na.omit)
 summary(glm_fit_aqi_vs_pollutants_temp_humid)
 plot(glm_fit_aqi_vs_pollutants_temp_humid)
 aic_glm_aqi_pollutants_aqi <- AIC(glm_fit_aqi_vs_pollutants_temp_humid)
@@ -504,7 +505,7 @@ test_data  <- clean_data[-sample_index, ]
 # H_a (alternative): At least one pollutant concentration significantly predicts the AQI
 ```{r}
 # Hypothesis 1: Pollutant variables Model
-m1 <- lm(aqi ~ co_ppm + benzene_ug_m3 + nox_ppb + no2_ppb + sensor_o3, 
+m1 <- lm(aqi ~ co_ppm + nox_ppb + no2_ppb + sensor_o3, 
          data = train_data)
 AIC(m1)
 summary(m1)
@@ -536,5 +537,12 @@ AIC(m3)
 summary(m3)
 par(mfrow = c(2, 2))
 plot(m3)
+```
+
+
+```{r}
+# Generate standard ANOVA table for your final interaction model
+anova_table <- anova(m3)
+print(anova_table)
 ```
 
