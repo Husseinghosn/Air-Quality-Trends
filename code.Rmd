@@ -505,7 +505,7 @@ test_data  <- clean_data[-sample_index, ]
 # H_a (alternative): At least one pollutant concentration significantly predicts the AQI
 ```{r}
 # Hypothesis 1: Pollutant variables Model
-m1 <- lm(aqi ~ co_ppm + nox_ppb + no2_ppb + sensor_o3, 
+m1 <- lm(log(aqi) ~ co_ppm + nox_ppb + no2_ppb + sensor_o3, 
          data = train_data)
 AIC(m1)
 summary(m1)
@@ -544,5 +544,12 @@ plot(m3)
 # Generate standard ANOVA table for your final interaction model
 anova_table <- anova(m3)
 print(anova_table)
+```
+
+```{r}
+# predictions using test data
+pred1 <- exp(predict(m1, newdata = test_data))
+pred2 <- exp(predict(m2, newdata = test_data))
+pred3 <- exp(predict(m3, newdata = test_data))
 ```
 
