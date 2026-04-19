@@ -505,12 +505,30 @@ test_data  <- clean_data[-sample_index, ]
 # H_a (alternative): At least one pollutant concentration significantly predicts the AQI
 ```{r}
 # Hypothesis 1: Pollutant variables Model
-m1 <- lm(log(aqi) ~ co_ppm + nox_ppb + no2_ppb + sensor_o3, 
+m1 <- lm(log(aqi) ~ co_ppm + nox_ppb + no2_ppb, 
          data = train_data)
+
+pred1 <- predict(m1, newdata = test_data)
+
+rmse1 <- sqrt(mean((test_data$aqi - pred1)^2))
+rmse1
+
+mae1 <- mean(abs(test_data$aqi - pred1))
+mae1
+
+sse1 <- sum((test_data$aqi - pred1)^2)
+sst1 <- sum((test_data$aqi - mean(test_data$aqi))^2)
+r2_test1 <- 1 - sse1/sst1
+r2_test1
+
 AIC(m1)
 summary(m1)
 par(mfrow = c(2, 2))
 plot(m1)
+```
+```{r}
+anova_table1 <- anova(m1)
+print(anova_table1)
 ```
 
 # H_0: Environmental factors have no relationship with log(AQI)
@@ -519,10 +537,28 @@ plot(m1)
 # Hypothesis 2 Environmental variables 
 m2 <- lm(log(aqi) ~ temperature_c + relative_humidty + absolute_humidity, 
          data = train_data)
+
+pred2 <- exp(predict(m2, newdata = test_data))
+
+rmse2 <- sqrt(mean((test_data$aqi - pred2)^2))
+rmse2
+
+mae2 <- mean(abs(test_data$aqi - pred2))
+mae2
+
+sse2 <- sum((test_data$aqi - pred2)^2)
+sst2 <- sum((test_data$aqi - mean(test_data$aqi))^2)
+r2_test2 <- 1 - sse2/sst2
+r2_test2
+
 AIC(m2)
 summary(m2)
 par(mfrow = c(2, 2))
 plot(m2)
+```
+```{r}
+anova_table2 <- anova(m2)
+print(anova_table2)
 ```
 
 
@@ -533,6 +569,20 @@ plot(m2)
 m3 <- lm(log(aqi) ~ co_ppm + benzene_ug_m3 + nox_ppb + no2_ppb +
                temperature_c + relative_humidty + absolute_humidity, 
          data = train_data)
+
+pred3 <- exp(predict(m3, newdata = test_data))
+
+rmse3 <- sqrt(mean((test_data$aqi - pred3)^2))
+rmse3
+
+mae3 <- mean(abs(test_data$aqi - pred3))
+mae3
+
+sse3 <- sum((test_data$aqi - pred1)^2)
+sst3 <- sum((test_data$aqi - mean(test_data$aqi))^2)
+r2_test3 <- 1 - sse3/sst3
+r2_test3
+
 AIC(m3)
 summary(m3)
 par(mfrow = c(2, 2))
@@ -541,15 +591,19 @@ plot(m3)
 
 
 ```{r}
-# Generate standard ANOVA table for your final interaction model
 anova_table <- anova(m3)
 print(anova_table)
 ```
 
 ```{r}
-# predictions using test data
-pred1 <- exp(predict(m1, newdata = test_data))
-pred2 <- exp(predict(m2, newdata = test_data))
-pred3 <- exp(predict(m3, newdata = test_data))
+library(knitr)
+
+results <- data.frame(Model = c("M1", "M2", "M3"),
+                      RMSE = c(rmse1, rmse2, rmse3),
+                      MAE = c(mae1, mae2, mae3),
+                      Test_R2 = c(r2_test1, r2_test2, r2_test3),
+                      AIC = c(AIC(m1), AIC(m2), AIC(m3)))
+
+kable(results, caption = "Metrics for All Models", digits = 4)
 ```
 
