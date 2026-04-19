@@ -3,16 +3,21 @@ title: "Air-Quality-Trends"
 author: "Hussein Ghosin, Kazuma Bowring, Derrick Li"
 date: "2026-04-14"
 output:
-  word_document: default
-  html_notebook: default
   pdf_document: default
+  word_document: default
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    df_print: paged
 ---
 
-```{r setup, include=FALSE, comment=""}
-knitr::opts_chunk$set(echo = FALSE,warning = FALSE, message = FALSE)
-#Warning - false, message=false removes warning for package being installed
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE, 
+  fig.width = 8,  fig.height = 5 
+)
 ```
-
 
 # Download and read in dataset
 ```{r, comment=""}
@@ -345,7 +350,7 @@ plot_pollutants_by_health(clean_data, pollutants, "aqi_health")
 ```
 
 # Q4. Model
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="",include = FALSE}
 #predicting AQI from only pollutants
 set.seed(123)  # For reproducibility
 aqi_index_trainingRowIndex <- sample(1:nrow(clean_data), 0.8 * nrow(data))  
@@ -367,7 +372,7 @@ rmse
 ```
 
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #predicting AQI from pollutants and interaction variables
 set.seed(123)  # For reproducibility
 aqi_index_trainingRowIndex_humidityntemp <- sample(1:nrow(clean_data), 0.8 * nrow(clean_data))  
@@ -396,7 +401,7 @@ rmse
 ```
 
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #DO note AIC's may be large simply because our sample is massive, so a large VIF doesnt mean its bad
 #generalized linear model predicting aqi_health in response to pollutants omitting n/a results and predictors
 #str(data)
@@ -409,7 +414,7 @@ print(paste("the AIC value of this GLM is ", aic_glm_fit_pollutants_aqi_healthy)
 ```
 
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #linear model predicting aqi based on aqi of pollutants
 lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+no2_ppb+i_co+i_no2+i_benzene+i_nox, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_pollutants_aqi)
@@ -418,7 +423,7 @@ aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
 print(paste("the AIC value of this LM (AQI prediction based on pollutant AQI) is ", aic_lm_aqi_pollutants_aqi))
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #linear model predicting aqi based on pollutants omitting na values from linear modelling,
 lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_pollutants_aqi)
@@ -427,7 +432,7 @@ aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
 print(paste("the AIC value of this LM (AQI prediction based on pollutant ) is ", aic_lm_aqi_pollutants_aqi))
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #for VIF
 #install.packages("car")
 library(car)
@@ -444,7 +449,7 @@ print(paste("the GVIF^(1/(2*Df)) value of this LM (AQI prediction based on pollu
 #Vif's return 1 as well for GVIF, this is our RAW VIF
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #VIF library (car) in previous code block
 
 # GENERALIZED linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
@@ -456,7 +461,7 @@ aic_glm_aqi_pollutants_aqi <- AIC(glm_fit_aqi_vs_pollutants_temp_humid)
 
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #linear model predicting aqi based on pollutants omitting na values from linear modelling,
 lm_fit_aqi_pollutants_aqi <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = clean_data, na.action = na.omit)
 summary(lm_fit_aqi_pollutants_aqi)
@@ -464,7 +469,7 @@ plot(lm_fit_aqi_pollutants_aqi)
 aic_lm_aqi_pollutants_aqi <- AIC(lm_fit_aqi_pollutants_aqi)
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #for VIF
 #install.packages("car")
 library(car)
@@ -479,7 +484,7 @@ vif_lm_fit_aqi_vs_pollutants_temp_humid <- vif(lm_fit_aqi_vs_pollutants_temp_hum
 #Vif's return 1 as well for GVIF, this is our RAW VIF
 ```
 
-```{r, echo=FALSE, comment=""}
+```{r, echo=FALSE, comment="", include = FALSE}
 #VIF library (car) in previous code block
 
 # GENERALIZED linear model predicting aqi based on pollutants and temperature + both humidities ^2 to chart all interaction variables
