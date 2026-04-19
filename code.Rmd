@@ -340,7 +340,7 @@ table(clean_data$aqi_health)
 
 plot_health_over_time(clean_data, health_col = "aqi_health", time_unit = "month")
 
-pollutants = c("co_ppm", "benzene_ug_m3", "nox_ppb", "no2_ppb")
+pollutants = c("co_ppm", "benzene_ppb", "nox_ppb", "no2_ppb")
 plot_pollutants_by_health(clean_data, pollutants, "aqi_health")
 ```
 
@@ -352,13 +352,13 @@ aqi_index_trainingRowIndex <- sample(1:nrow(clean_data), 0.8 * nrow(data))
 aqi_index_train_data <- clean_data[aqi_index_trainingRowIndex, ]
 aqi_index_test_data  <- clean_data[-aqi_index_trainingRowIndex, ]
 
-model1_aqi_index <- lm(aqi ~ co_ppm+benzene_ug_m3+nox_ppb+no2_ppb, data = aqi_index_train_data)
+model1_aqi_index <- lm(aqi ~ co_ppm+benzene_ppb+nox_ppb+no2_ppb, data = aqi_index_train_data)
 #summary(model1_aqi_index)
 predictions <- predict(model1_aqi_index, aqi_index_test_data)
 #predictions
 
 #Calculate CorrelationAccuracy 0 means bad or none, 1 is strong/good
-actuals_preds <- data.frame(cbind(actual = (aqi_index_test_data$co_ppm+aqi_index_test_data$benzene_ug_m3+aqi_index_test_data$nox_ppb+aqi_index_test_data$no2_ppb), predicted = predictions))
+actuals_preds <- data.frame(cbind(actual = (aqi_index_test_data$co_ppm+aqi_index_test_data$benzene_ppb+aqi_index_test_data$nox_ppb+aqi_index_test_data$no2_ppb), predicted = predictions))
 correlation_accuracy <- cor(actuals_preds)
 correlation_accuracy
 #Calculate RMSE Root mean squared results vary base on variance of data range RMSE of 10 for 0-30 is bad, but good for 400-5000, being largely over the maximum value we get is ba
@@ -381,7 +381,7 @@ predictions_humidityntemp <- predict(model1_aqi_index_humidityntemp, aqi_index_t
 
 #Calculate CorrelationAccuracy 0 means bad or none, 1 is strong/good
 actuals_preds_humidityntemp <- data.frame(cbind(actual = (aqi_index_test_data_humidityntemp$co_ppm+
-                                                       aqi_index_test_data_humidityntemp$benzene_ug_m3+
+                                                       aqi_index_test_data_humidityntemp$benzene_ppb+
                                                        aqi_index_test_data_humidityntemp$nox_ppb+
                                                        aqi_index_test_data_humidityntemp$no2_ppb+
                                                        aqi_index_test_data_humidityntemp$temperature_c+
@@ -505,7 +505,7 @@ test_data  <- clean_data[-sample_index, ]
 # H_a (alternative): At least one pollutant concentration significantly predicts the AQI
 ```{r}
 # Hypothesis 1: Pollutant variables Model
-m1 <- lm(log(aqi) ~ co_ppm + nox_ppb + no2_ppb, 
+m1 <- lm(log(aqi) ~ co_ppm + benzene_ppb + nox_ppb + no2_ppb, 
          data = train_data)
 
 pred1 <- predict(m1, newdata = test_data)
@@ -566,7 +566,7 @@ print(anova_table2)
 # H_a: The combined model provides statistically more fit AQI predicting
 ```{r}
 # Hypothesis 3: Combination of environmental and pollutant variables
-m3 <- lm(log(aqi) ~ co_ppm + benzene_ug_m3 + nox_ppb + no2_ppb +
+m3 <- lm(log(aqi) ~ co_ppm + benzene_ppb + nox_ppb + no2_ppb +
                temperature_c + relative_humidty + absolute_humidity, 
          data = train_data)
 
